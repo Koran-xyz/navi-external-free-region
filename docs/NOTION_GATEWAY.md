@@ -1,4 +1,4 @@
-# Notion Gateway v0.2
+# Notion Gateway v0.3
 
 外部自由領域の当面の共通記録庫は Notion の「内部自由領域システム」DB とする。
 
@@ -23,17 +23,33 @@
 }
 ```
 
-## 書き込み実装
+## 実装
 
-`src/notion_writer.py` は append-only（新規追記専用）。
+- `src/notion_writer.py`: Notionへの新規追記だけを行う
+- `server/app.py`: ブラウザから呼ぶHTTP窓口
+- `requirements.txt`: Pythonサーバー依存
+- `.env.example`: 必要な環境変数名だけを記載
 
-必要な環境変数:
+## 必要なSecrets
 
-- `NOTION_TOKEN`: Notionの内部接続トークン。GitHub・ブラウザへ置かない。
-- `NOTION_DATA_SOURCE_ID`: 任意。未設定時は現在の共通記録DBを使用。
-- `NOTION_VERSION`: 任意。未設定時は `2025-09-03`。
+- `NOTION_TOKEN`
+- `NOTION_DATA_SOURCE_ID`
+- `GATEWAY_WRITE_KEY`
+- `ALLOWED_ORIGIN`
+- `NOTION_VERSION`（任意）
 
-ブラウザから直接Notion APIへトークンを送らない。ブラウザは安全なサーバー側エンドポイントへ作業記録JSONを送り、サーバー側が `notion_writer.py` を呼ぶ。
+## 通信
+
+```text
+Browser chat
+  -> POST /api/notion/log
+  -> server/app.py
+  -> src/notion_writer.py
+  -> Notion
+```
+
+ブラウザへNotionトークンを渡さない。
+サーバー側だけがNotion接続情報を持ち、書き込みAPIはBearerキーを確認してから新規記録を作る。
 
 ## 固定ルール
 
@@ -41,4 +57,4 @@
 - 既存記録は上書きせず、報告は新規追記する。
 - 個人情報、会社機密、住所、生GPS、認証情報は共通記録に入れない。
 - 外部送信・承認・削除は人が判断する。
-- トークンは環境変数／Secretsでのみ保持する。
+- トークン、データソースID、書き込みキーは公開GitHubへ固定しない。
