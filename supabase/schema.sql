@@ -48,7 +48,7 @@ create table if not exists public.handoffs (
   purpose text not null,
   current_state text not null,
   task text not null,
-  references jsonb not null default '[]'::jsonb,
+  reference_links jsonb not null default '[]'::jsonb,
   expected_output jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
