@@ -1,0 +1,20 @@
+{
+  "project_id": "external-free-region-v0.1",
+  "purpose": "外部自由領域の最小システムを構築する。",
+  "current_state": "初期化済み。メタルール原文は未固定。",
+  "required_reads": [
+    "META_RULES.md",
+    "RULES.md",
+    "workspace/BOARD.md",
+    "workspace/PROJECT_STATE.json"
+  ],
+  "task": "メタルール正本を固定した後、Notion・GitHub記録アダプターの仕様を作る。",
+  "expected_output": [
+    "実施内容",
+    "根拠・確認結果",
+    "未解決",
+    "次作業",
+    "更新対象"
+  ],
+  "completion_rule": "未確認の内容を完了と書かない。承認が必要な変更は承認待ちとして止める。"
+}
