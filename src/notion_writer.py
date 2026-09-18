@@ -1,7 +1,7 @@
 """Notion append-only writer for the external free region.
 
-This module creates NEW pages only. It never edits or deletes existing records.
-Secrets are read only from environment variables.
+Creates NEW pages only. It never edits or deletes existing records.
+All connection values are supplied through environment variables.
 """
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from urllib.request import Request, urlopen
 
 NOTION_API_URL = "https://api.notion.com/v1/pages"
 NOTION_VERSION = os.getenv("NOTION_VERSION", "2025-09-03")
-DEFAULT_DATA_SOURCE_ID = "b3bd8666-728d-4a94-8d97-a0d28c686899"
 
 REQUIRED_FIELDS = (
     "record_name",
@@ -38,6 +37,13 @@ SENSITIVE_WORDS = (
 
 class NotionWriterError(RuntimeError):
     """Raised when a record cannot be safely written."""
+
+
+def _required_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise NotionWriterError(f"{name} が設定されていません")
+    return value
 
 
 def validate_record(record: dict[str, Any]) -> None:
@@ -71,8 +77,7 @@ def _title(value: str) -> dict[str, Any]:
 def build_payload(record: dict[str, Any]) -> dict[str, Any]:
     """Map the common work-record contract to the current Notion schema."""
     validate_record(record)
-
-    data_source_id = os.getenv("NOTION_DATA_SOURCE_ID", DEFAULT_DATA_SOURCE_ID)
+    data_source_id = _required_env("NOTION_DATA_SOURCE_ID")
 
     return {
         "parent": {
@@ -99,11 +104,9 @@ def build_payload(record: dict[str, Any]) -> dict[str, Any]:
 
 def append_record(record: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
     """Create one new Notion record and return a compact result."""
-    token = os.getenv("NOTION_TOKEN", "").strip()
-    if not token:
-        raise NotionWriterError("NOTION_TOKEN が設定されていません")
-
+    token = _required_env("NOTION_TOKEN")
     payload = build_payload(record)
+
     request = Request(
         NOTION_API_URL,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
