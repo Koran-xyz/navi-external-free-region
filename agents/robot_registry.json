@@ -1,0 +1,31 @@
+{
+  "version": "0.1",
+  "robots": [
+    {
+      "robot_id": "read_only",
+      "display_name": "読み出し専用ロボット",
+      "capabilities": [
+        "目的・状態・次作業・承認済みルール・名札の取得"
+      ],
+      "writes": false,
+      "required_fields": []
+    },
+    {
+      "robot_id": "write_only",
+      "display_name": "書き込み専用ロボット",
+      "capabilities": [
+        "Notion DBへの新規作業報告の追記"
+      ],
+      "writes": true,
+      "required_fields": [
+        "record_name",
+        "actor",
+        "summary",
+        "evidence",
+        "result",
+        "next_action",
+        "status"
+      ]
+    }
+  ]
+}
