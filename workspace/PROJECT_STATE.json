@@ -1,0 +1,16 @@
+{
+  "project_id": "external-free-region-v0.1",
+  "title": "Navi External Free Region",
+  "purpose": "複数AIと人が共有状態を読み、作業し、記録し、引き継ぐ外部自由領域を構築する。",
+  "current_state": "初期化済み・メタルール原文の固定待ち",
+  "next_action": "メタルール正本を固定し、読込確認を有効化する。",
+  "assigned_roles": {
+    "教授": "目的決定・最終承認",
+    "ゴテン": "設計・研究・採否整理",
+    "Copilot": "Python・GitHub・実装",
+    "Gemini": "第三者レビュー",
+    "ナビィ": "受付・現在地・次作業の案内"
+  },
+  "status": "blocked_by_meta_rules",
+  "updated_at": "2026-09-18"
+}
