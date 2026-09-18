@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "robots": [
     {
       "robot_id": "read_only",
@@ -17,6 +17,8 @@
         "Notion DBへの新規作業報告の追記"
       ],
       "writes": true,
+      "implementation": "src/notion_writer.py",
+      "http_endpoint": "POST /api/notion/log",
       "required_fields": [
         "record_name",
         "actor",
