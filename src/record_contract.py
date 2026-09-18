@@ -30,6 +30,7 @@ class WorkRecord:
             "kind": self.kind,
             "content": self.content,
             "evidence": self.evidence,
+            "result": self.result,
             "next_action": self.next_action,
         }
         missing = [name for name, value in required.items() if not value.strip()]
