@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Navi External Free Region Work Record v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_name",
+    "actor",
+    "summary",
+    "evidence",
+    "result",
+    "next_action",
+    "status"
+  ],
+  "properties": {
+    "record_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "string"
+    },
+    "result": {
+      "type": "string"
+    },
+    "next_action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "未着手",
+        "進行中",
+        "完了",
+        "停止",
+        "承認待ち"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "完了"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}
