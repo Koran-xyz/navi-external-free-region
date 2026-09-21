@@ -1,0 +1,44 @@
+{
+  "schema_version": "0.1",
+  "policy": {
+    "default_mode": "append_only",
+    "destructive_actions": false,
+    "human_approval_for_destructive_actions": true,
+    "secret_like_values_rejected": true
+  },
+  "robots": [
+    {
+      "robot_id": "notion_page_append",
+      "display_name": "Notion追記ロボット",
+      "target": "notion",
+      "action": "append",
+      "status": "implemented",
+      "required_configuration": [
+        "NOTION_TOKEN"
+      ],
+      "description": "指定Notionページの末尾へ会議メッセージを追記する。既存内容の削除・置換は行わない。"
+    },
+    {
+      "robot_id": "github_issue_comment",
+      "display_name": "GitHub会議コメントロボット",
+      "target": "github",
+      "action": "append",
+      "status": "implemented",
+      "required_configuration": [
+        "GITHUB_ROBOT_TOKEN または GITHUB_TOKEN"
+      ],
+      "description": "指定GitHub Issueへ会議メッセージをコメントとして追記する。Issue本文の置換や削除は行わない。"
+    },
+    {
+      "robot_id": "google_docs_append",
+      "display_name": "Googleドキュメント追記ロボット",
+      "target": "google_docs",
+      "action": "append",
+      "status": "implemented",
+      "required_configuration": [
+        "GOOGLE_DOCS_BRIDGE_URL または GOOGLE_DOCS_ACCESS_TOKEN"
+      ],
+      "description": "指定Googleドキュメント末尾へ会議メッセージを追記する。Bridge経由を優先し、直接OAuthトークンも使用可能。"
+    }
+  ]
+}
