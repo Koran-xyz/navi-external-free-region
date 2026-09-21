@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
 COPY server ./server
+COPY web ./web
 COPY workspace ./workspace
 COPY agents ./agents
 COPY rules ./rules
