@@ -1,21 +1,28 @@
 {
-  "meeting_id": "MEETING-0001",
-  "created_at": null,
-  "user_request": "",
-  "mode": "integrated",
+  "meeting_id": "MEETING-20260921-001",
+  "created_at": "2026-09-21T11:19:24Z",
+  "user_request": "外部システム領域を使い、3チーム共同会議を実際に試す。議題：3チーム共同会議を実運用にするため、次に作るべき最小実装は何か？",
+  "mode": "parallel",
   "participants": [
     "goten_team",
     "maria_assistant_team",
     "eden_team"
   ],
-  "status": "received",
+  "status": "discussing",
   "team_answers": {
-    "goten_team": null,
+    "goten_team": "GitHub Issueを会議受付箱、Notionを決定正本、Google Docsを自由議論ログにする3層運用から始める。各AIの接続方法は統一せず、共通の会議形式だけ固定する。",
     "maria_assistant_team": null,
     "eden_team": null
   },
-  "discussion_log": [],
+  "discussion_log": [
+    {
+      "speaker": "goten_team",
+      "type": "team_answer",
+      "content": "最小実装はGitHub Issue / Notion / Google Docsの3層運用。まず手動受け渡しで形式を検証し、安定した部分だけPython化する。",
+      "at": "2026-09-21T11:20:00Z"
+    }
+  ],
   "admin_summary": null,
   "final_result": null,
-  "next_action": null
+  "next_action": "マリア助手チームとエデンチームへGitHub Issue #11を渡し、同じ回答フォーマットで回答を回収する。"
 }
