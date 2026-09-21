@@ -29,7 +29,7 @@ if allowed_origin:
         allow_origins=[allowed_origin],
         allow_credentials=False,
         allow_methods=["POST", "GET"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "X-OpenAI-API-Key", "X-Gemini-API-Key"],
     )
 
 
@@ -92,13 +92,23 @@ def chat_providers(authorization: str | None = Header(default=None)):
 
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest, authorization: str | None = Header(default=None)):
+async def chat(
+    request: ChatRequest,
+    authorization: str | None = Header(default=None),
+    x_openai_api_key: str | None = Header(default=None, alias="X-OpenAI-API-Key"),
+    x_gemini_api_key: str | None = Header(default=None, alias="X-Gemini-API-Key"),
+):
     _authorize(authorization, "GATEWAY_CHAT_KEY")
+    api_keys = {
+        "openai": (x_openai_api_key or "").strip(),
+        "gemini": (x_gemini_api_key or "").strip(),
+    }
     try:
         return await route_and_call(
             message=request.message,
             preferred_provider=request.preferred_provider,
             verify=request.verify,
+            api_keys=api_keys,
         )
     except ProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

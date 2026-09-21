@@ -1,7 +1,7 @@
 """AI provider adapters for Multi-AI Chat v1.
 
-Secrets are read only from environment variables. No provider key is ever returned
-to the browser.
+Provider keys can come from the server environment or, for a private device
+session, from request-scoped overrides. Keys are never returned to the browser.
 """
 from __future__ import annotations
 
@@ -15,10 +15,18 @@ class ProviderError(RuntimeError):
     pass
 
 
-def configured_providers() -> dict[str, bool]:
+def _key_from(overrides: dict[str, str] | None, name: str, env_name: str) -> str:
+    if overrides:
+        value = (overrides.get(name) or "").strip()
+        if value:
+            return value
+    return os.getenv(env_name, "").strip()
+
+
+def configured_providers(overrides: dict[str, str] | None = None) -> dict[str, bool]:
     return {
-        "openai": bool(os.getenv("OPENAI_API_KEY", "").strip()),
-        "gemini": bool(os.getenv("GEMINI_API_KEY", "").strip()),
+        "openai": bool(_key_from(overrides, "openai", "OPENAI_API_KEY")),
+        "gemini": bool(_key_from(overrides, "gemini", "GEMINI_API_KEY")),
         "copilot": bool(os.getenv("COPILOT_BRIDGE_URL", "").strip()),
     }
 
@@ -57,8 +65,8 @@ def _extract_gemini_text(data: dict[str, Any]) -> str:
     raise ProviderError("Gemini interaction did not contain text output")
 
 
-async def call_openai(prompt: str, system: str) -> dict[str, Any]:
-    key = os.getenv("OPENAI_API_KEY", "").strip()
+async def call_openai(prompt: str, system: str, api_key: str | None = None) -> dict[str, Any]:
+    key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
     if not key:
         raise ProviderError("OPENAI_API_KEY is not configured")
 
@@ -86,8 +94,8 @@ async def call_openai(prompt: str, system: str) -> dict[str, Any]:
     }
 
 
-async def call_gemini(prompt: str, system: str) -> dict[str, Any]:
-    key = os.getenv("GEMINI_API_KEY", "").strip()
+async def call_gemini(prompt: str, system: str, api_key: str | None = None) -> dict[str, Any]:
+    key = (api_key or os.getenv("GEMINI_API_KEY", "")).strip()
     if not key:
         raise ProviderError("GEMINI_API_KEY is not configured")
 
@@ -116,11 +124,6 @@ async def call_gemini(prompt: str, system: str) -> dict[str, Any]:
 
 
 async def call_copilot_bridge(prompt: str, system: str) -> dict[str, Any]:
-    """Call a future/externally hosted Copilot adapter.
-
-    Microsoft Copilot itself is not assumed to expose a generic chat endpoint.
-    This adapter deliberately expects an operator-controlled bridge.
-    """
     url = os.getenv("COPILOT_BRIDGE_URL", "").strip()
     if not url:
         raise ProviderError("COPILOT_BRIDGE_URL is not configured")
@@ -150,11 +153,17 @@ async def call_copilot_bridge(prompt: str, system: str) -> dict[str, Any]:
     }
 
 
-async def call_provider(provider: str, prompt: str, system: str) -> dict[str, Any]:
+async def call_provider(
+    provider: str,
+    prompt: str,
+    system: str,
+    api_keys: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    api_keys = api_keys or {}
     if provider == "openai":
-        return await call_openai(prompt, system)
+        return await call_openai(prompt, system, api_keys.get("openai"))
     if provider == "gemini":
-        return await call_gemini(prompt, system)
+        return await call_gemini(prompt, system, api_keys.get("gemini"))
     if provider == "copilot":
         return await call_copilot_bridge(prompt, system)
     raise ProviderError(f"unsupported provider: {provider}")

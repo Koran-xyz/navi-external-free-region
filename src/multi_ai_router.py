@@ -58,8 +58,12 @@ def _contains(text: str, words: tuple[str, ...]) -> bool:
     return any(word.lower() in lower for word in words)
 
 
-def choose_provider(message: str, preferred_provider: str | None = None) -> str:
-    available = configured_providers()
+def choose_provider(
+    message: str,
+    preferred_provider: str | None = None,
+    api_keys: dict[str, str] | None = None,
+) -> str:
+    available = configured_providers(api_keys)
     if preferred_provider:
         if preferred_provider not in available:
             raise ProviderError(f"unknown provider: {preferred_provider}")
@@ -80,8 +84,8 @@ def choose_provider(message: str, preferred_provider: str | None = None) -> str:
     raise ProviderError("no AI provider is configured")
 
 
-def choose_verifier(primary: str) -> str | None:
-    available = configured_providers()
+def choose_verifier(primary: str, api_keys: dict[str, str] | None = None) -> str | None:
+    available = configured_providers(api_keys)
     for candidate in ("gemini", "openai", "copilot"):
         if candidate != primary and available[candidate]:
             return candidate
@@ -110,11 +114,13 @@ async def route_and_call(
     message: str,
     preferred_provider: str | None = None,
     verify: bool = False,
+    api_keys: dict[str, str] | None = None,
 ) -> dict[str, Any]:
+    api_keys = api_keys or {}
     context = shared_context()
-    primary_name = choose_provider(message, preferred_provider)
+    primary_name = choose_provider(message, preferred_provider, api_keys)
     system = _system_prompt(context)
-    primary = await call_provider(primary_name, message, system)
+    primary = await call_provider(primary_name, message, system, api_keys)
 
     result: dict[str, Any] = {
         "navi": {
@@ -130,7 +136,7 @@ async def route_and_call(
     if not verify:
         return result
 
-    verifier_name = choose_verifier(primary_name)
+    verifier_name = choose_verifier(primary_name, api_keys)
     if not verifier_name:
         result["navi"]["verification_status"] = "skipped_no_second_provider"
         return result
@@ -142,7 +148,7 @@ async def route_and_call(
         f"利用者の依頼:\n{message}\n\n"
         f"一次回答:\n{primary['text']}"
     )
-    verification = await call_provider(verifier_name, verification_prompt, system)
+    verification = await call_provider(verifier_name, verification_prompt, system, api_keys)
     result["verification"] = verification
 
     integration_prompt = (
@@ -153,7 +159,7 @@ async def route_and_call(
         f"一次回答({primary_name}):\n{primary['text']}\n\n"
         f"検証回答({verifier_name}):\n{verification['text']}"
     )
-    integrated = await call_provider(primary_name, integration_prompt, system)
+    integrated = await call_provider(primary_name, integration_prompt, system, api_keys)
     result["integrated_answer"] = integrated["text"]
     result["navi"]["verification_status"] = "completed"
     result["navi"]["verifier"] = verifier_name
