@@ -29,7 +29,7 @@ if allowed_origin:
         allow_origins=[allowed_origin],
         allow_credentials=False,
         allow_methods=["POST", "GET"],
-        allow_headers=["Authorization", "Content-Type", "X-OpenAI-API-Key", "X-Gemini-API-Key"],
+        allow_headers=["Authorization", "Content-Type", "X-OpenAI-API-Key", "X-Gemini-API-Key", "X-Copilot-API-Key"],
     )
 
 
@@ -115,11 +115,13 @@ async def chat(
     authorization: str | None = Header(default=None),
     x_openai_api_key: str | None = Header(default=None, alias="X-OpenAI-API-Key"),
     x_gemini_api_key: str | None = Header(default=None, alias="X-Gemini-API-Key"),
+    x_copilot_api_key: str | None = Header(default=None, alias="X-Copilot-API-Key"),
 ):
     _authorize(authorization, "GATEWAY_CHAT_KEY")
     api_keys = {
         "openai": (x_openai_api_key or "").strip(),
         "gemini": (x_gemini_api_key or "").strip(),
+        "copilot": (x_copilot_api_key or "").strip(),
     }
     try:
         return await route_and_call(

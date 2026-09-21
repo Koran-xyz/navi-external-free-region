@@ -149,12 +149,16 @@ async def call_gemini(prompt: str, system: str, api_key: str | None = None) -> d
     }
 
 
-async def call_copilot_bridge(prompt: str, system: str) -> dict[str, Any]:
+async def call_copilot_bridge(
+    prompt: str,
+    system: str,
+    api_key: str | None = None,
+) -> dict[str, Any]:
     url = os.getenv("COPILOT_BRIDGE_URL", "").strip()
     if not url:
         raise ProviderError("COPILOT_BRIDGE_URL is not configured")
 
-    key = os.getenv("COPILOT_BRIDGE_KEY", "").strip()
+    key = (api_key or os.getenv("COPILOT_BRIDGE_KEY", "")).strip()
     headers = {"Content-Type": "application/json"}
     if key:
         headers["Authorization"] = f"Bearer {key}"
@@ -191,5 +195,5 @@ async def call_provider(
     if provider == "gemini":
         return await call_gemini(prompt, system, api_keys.get("gemini"))
     if provider == "copilot":
-        return await call_copilot_bridge(prompt, system)
+        return await call_copilot_bridge(prompt, system, api_keys.get("copilot"))
     raise ProviderError(f"unsupported provider: {provider}")
