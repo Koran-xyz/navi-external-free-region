@@ -25,3 +25,6 @@ def test_browser_ui_is_served():
     assert "端末内部バックアップから復元" in response.text
     assert "⌂ ホーム" in response.text
     assert "providerTop" in response.text
+    assert "migrateLegacyStorage" in response.text
+    assert "接続キーが見つかりません" in response.text
+    assert response.headers["cache-control"].startswith("no-store")

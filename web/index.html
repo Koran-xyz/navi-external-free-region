@@ -2,7 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Navi Multi-AI Chat</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#0b0d10;--panel:#14181e;--panel2:#0f1318;--line:#2a313b;--text:#f4f7fb;--muted:#9aa6b4;--ok:#76d99c;--bad:#ffb4b4;--warn:#ffd27a}
@@ -69,7 +72,55 @@ const S={
  openai:"navi.v5.openai.current",openaiBackup:"navi.v5.openai.backup",openaiOK:"navi.v5.openai.ok",
  copilot:"navi.v5.copilot.current",copilotBackup:"navi.v5.copilot.backup",copilotOK:"navi.v5.copilot.ok"
 };
+
 let editing=null, serverProviders={openai:false,gemini:false,copilot:false};
+
+function firstStored(keys){
+  for(const key of keys){
+    const v=localStorage.getItem(key);
+    if(v) return v;
+  }
+  return "";
+}
+function migrateLegacyStorage(){
+  if(!localStorage.getItem(S.gateway)){
+    const legacyGateway = firstStored(["navi.v4.gateway","navi.settings.gateway_key"]) || sessionStorage.getItem("navi_access_key") || "";
+    if(legacyGateway) localStorage.setItem(S.gateway, legacyGateway);
+  }
+
+  if(!localStorage.getItem(S.gemini)){
+    const v=firstStored(["navi.v4.gemini","navi.settings.gemini_api_key"]);
+    if(v){
+      localStorage.setItem(S.gemini,v);
+      localStorage.setItem(S.geminiBackup,v);
+      const verified = localStorage.getItem("navi.v4.gemini.ok")==="1";
+      if(verified) localStorage.setItem(S.geminiOK,"1");
+    }
+  }
+
+  if(!localStorage.getItem(S.openai)){
+    const v=firstStored(["navi.v4.openai","navi.settings.openai_api_key"]);
+    if(v){
+      localStorage.setItem(S.openai,v);
+      localStorage.setItem(S.openaiBackup,v);
+      const verified = localStorage.getItem("navi.v4.openai.ok")==="1";
+      if(verified) localStorage.setItem(S.openaiOK,"1");
+    }
+  }
+
+  if(!localStorage.getItem(S.provider)){
+    const p=firstStored(["navi.v4.provider","navi.settings.provider"]);
+    if(p) localStorage.setItem(S.provider,p);
+  }
+
+  if(localStorage.getItem(S.verify)===null){
+    const legacyV4=localStorage.getItem("navi.v4.verify");
+    const legacySettings=localStorage.getItem("navi.settings.verify");
+    const legacy = legacyV4 !== null ? legacyV4 : legacySettings;
+    if(legacy !== null) localStorage.setItem(S.verify, legacy==="true" ? "1" : legacy);
+  }
+}
+
 const meta={
  gateway:{title:"接続キー",help:"ナビィの入口キーだけを保存します。",verify:"gateway"},
  gemini:{title:"Gemini API",help:"Gemini専用。確認に成功した値だけ保存し、端末内部にも予備コピーを残します。",verify:"provider"},
@@ -132,7 +183,7 @@ $("providerTop").onchange=()=>{localStorage.setItem(S.provider,$("providerTop").
 $("verify").onchange=()=>{localStorage.setItem(S.verify,$("verify").checked?"1":"0");refresh()};
 function add(role,text,meta="",err=false){const e=$("emptyState");if(e)e.remove();const w=document.createElement("div");w.className="msg "+role;const b=document.createElement("div");b.className="bubble"+(err?" error":"");b.textContent=text;w.appendChild(b);if(meta){const m=document.createElement("div");m.className="meta";m.textContent=meta;w.appendChild(m)}$("messages").appendChild(w);$("messages").scrollTop=$("messages").scrollHeight;return w}
 async function sendMessage(){
- const text=$("message").value.trim();if(!text)return;const gateway=cur("gateway");if(!gateway){show("settingsScreen");return}
+ const text=$("message").value.trim();if(!text)return;const gateway=cur("gateway");if(!gateway){add("assistant","接続キーが見つかりません。右上の設定から接続キーを確認してください。","",true);return}
  const preferred=localStorage.getItem(S.provider)||"",verify=localStorage.getItem(S.verify)==="1";
  add("user",text);$("message").value="";$("send").disabled=true;const load=add("assistant","ナビィが処理中…");
  try{
@@ -145,6 +196,7 @@ async function sendMessage(){
  }catch(e){load.remove();add("assistant","エラー: "+e.message,"",true)}finally{$("send").disabled=false;$("message").focus()}
 }
 $("send").onclick=sendMessage;$("message").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}};
-loadServerStatus();
+migrateLegacyStorage();
+migrateLegacyStorage();\nloadServerStatus();
 </script>
 </body></html>
