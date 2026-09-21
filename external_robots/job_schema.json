@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Navi External Robot Job",
+  "type": "object",
+  "required": [
+    "robot_id",
+    "meeting_id",
+    "team_id",
+    "content",
+    "target"
+  ],
+  "properties": {
+    "robot_id": {
+      "type": "string",
+      "enum": [
+        "notion_page_append",
+        "github_issue_comment",
+        "google_docs_append"
+      ]
+    },
+    "meeting_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "team_id": {
+      "type": "string",
+      "enum": [
+        "goten_team",
+        "maria_assistant_team",
+        "eden_team"
+      ]
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 12000
+    },
+    "target": {
+      "type": "object"
+    },
+    "dry_run": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "additionalProperties": false
+}

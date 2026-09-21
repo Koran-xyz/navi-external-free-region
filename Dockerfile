@@ -11,6 +11,8 @@ COPY web ./web
 COPY workspace ./workspace
 COPY agents ./agents
 COPY rules ./rules
+COPY external_system ./external_system
+COPY external_robots ./external_robots
 COPY META_RULES.md RULES.md ./
 
 ENV PYTHONDONTWRITEBYTECODE=1

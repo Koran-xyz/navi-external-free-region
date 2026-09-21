@@ -18,8 +18,9 @@ from pydantic import BaseModel, Field
 from src.multi_ai_router import route_and_call, shared_context
 from src.notion_writer import NotionWriterError, append_record
 from src.provider_clients import ProviderError, configured_providers, validate_provider_key
+from src.robot_gateway import RobotError, execute_robot_job, robot_status
 
-app = FastAPI(title="Navi External Free Region Gateway", version="0.3.0")
+app = FastAPI(title="Navi External Free Region Gateway", version="0.4.0")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 allowed_origin = os.getenv("ALLOWED_ORIGIN", "").strip()
@@ -55,6 +56,15 @@ class ProviderKeyCheckRequest(BaseModel):
     api_key: str = Field(min_length=1, max_length=500)
 
 
+class RobotJobRequest(BaseModel):
+    robot_id: str = Field(min_length=1, max_length=100)
+    meeting_id: str = Field(min_length=1, max_length=120)
+    team_id: str = Field(min_length=1, max_length=120)
+    content: str = Field(min_length=1, max_length=12000)
+    target: dict = Field(default_factory=dict)
+    dry_run: bool = False
+
+
 def _authorize(authorization: str | None, env_name: str) -> None:
     expected = os.getenv(env_name, "").strip()
     if not expected:
@@ -80,7 +90,7 @@ def index():
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.3.0"}
+    return {"status": "ok", "version": "0.4.0"}
 
 
 @app.get("/api/status")
@@ -139,6 +149,29 @@ async def chat(
         )
     except ProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/api/robots/status")
+def robots_status(authorization: str | None = Header(default=None)):
+    _authorize(authorization, "ROBOT_GATEWAY_KEY")
+    return {
+        "mode": "append_only",
+        "robots": robot_status(),
+    }
+
+
+@app.post("/api/robots/execute")
+async def robot_execute(
+    request: RobotJobRequest,
+    authorization: str | None = Header(default=None),
+):
+    _authorize(authorization, "ROBOT_GATEWAY_KEY")
+    try:
+        return await execute_robot_job(request.model_dump())
+    except RobotError as exc:
+        message = str(exc)
+        status_code = 503 if "not configured" in message else 400
+        raise HTTPException(status_code=status_code, detail=message) from exc
 
 
 @app.post("/api/notion/log")
