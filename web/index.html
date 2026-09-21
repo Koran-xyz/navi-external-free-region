@@ -162,10 +162,19 @@
       </div>
 
       <div class="setting-card">
-        <h2>この端末の接続キー</h2>
-        <p>チャット画面から分離して保存します。ここで一度入れれば、毎回入力しなくて済みます。</p>
-        <label for="gatewayKey">GATEWAY_CHAT_KEY</label>
-        <input id="gatewayKey" type="password" autocomplete="off" placeholder="Railwayに保存した接続キー" />
+        <h2>キー保存</h2>
+        <p>3つを別々の欄に保存します。1つを変更しても、ほかのキーは上書きされません。</p>
+
+        <label for="gatewayKey">① 接続キー — GATEWAY_CHAT_KEY</label>
+        <input id="gatewayKey" type="password" autocomplete="off" placeholder="ナビィに入るための接続キー" />
+
+        <label for="geminiKey">② Gemini — GEMINI_API_KEY</label>
+        <input id="geminiKey" type="password" autocomplete="off" placeholder="Gemini APIキー" />
+
+        <label for="openaiKey">③ OpenAI — OPENAI_API_KEY</label>
+        <input id="openaiKey" type="password" autocomplete="off" placeholder="OpenAI APIキー" />
+
+        <div class="note">この3つはこの端末内で別々に保存します。通信時はHTTPSで送信し、画面には表示しません。</div>
       </div>
 
       <div class="setting-card">
@@ -185,23 +194,25 @@
 
       <div class="setting-card">
         <h2>AI接続状態</h2>
-        <p>APIキーそのものはブラウザに保存しません。OpenAI / GeminiのキーはRailway側で別々に保存します。</p>
+        <p>端末に保存したキー、またはRailway側のキーを使って接続します。</p>
         <div id="providerStatuses" class="provider-status-list">
           <div class="provider-status"><span>OpenAI</span><span class="status-right">確認中</span></div>
           <div class="provider-status"><span>Gemini</span><span class="status-right">確認中</span></div>
           <div class="provider-status"><span>Copilot</span><span class="status-right">確認中</span></div>
         </div>
-        <div class="note">ここでは接続状態だけ確認します。APIキー同士が同じ欄で上書きされることはありません。</div>
+        <div class="note">各キーは別名で保存されます。GeminiとOpenAIの欄は互いに上書きしません。</div>
       </div>
 
-      <button id="saveSettings" class="save-btn">保存してチャットに戻る</button>
-      <button id="clearGatewayKey" class="danger-btn">この端末の接続キーを削除</button>
+      <button id="saveSettings" class="save-btn">3つを別々に保存してチャットに戻る</button>
+      <button id="clearGatewayKey" class="danger-btn">この端末の3つのキーを削除</button>
     </section>
   </div>
 
   <script>
     const STORAGE = {
       gateway: "navi.settings.gateway_key",
+      gemini: "navi.settings.gemini_api_key",
+      openai: "navi.settings.openai_api_key",
       provider: "navi.settings.provider",
       verify: "navi.settings.verify"
     };
@@ -213,6 +224,8 @@
     const saveSettings = document.getElementById("saveSettings");
     const clearGatewayKey = document.getElementById("clearGatewayKey");
     const gatewayKey = document.getElementById("gatewayKey");
+    const geminiKey = document.getElementById("geminiKey");
+    const openaiKey = document.getElementById("openaiKey");
     const provider = document.getElementById("provider");
     const verify = document.getElementById("verify");
     const providerBadge = document.getElementById("providerBadge");
@@ -224,8 +237,18 @@
 
     let providerState = { openai:false, gemini:false, copilot:false };
 
+    function migrateOldGatewayKey() {
+      if (!localStorage.getItem(STORAGE.gateway)) {
+        const old = sessionStorage.getItem("navi_access_key");
+        if (old) localStorage.setItem(STORAGE.gateway, old);
+      }
+    }
+
     function loadSettings() {
+      migrateOldGatewayKey();
       gatewayKey.value = localStorage.getItem(STORAGE.gateway) || "";
+      geminiKey.value = localStorage.getItem(STORAGE.gemini) || "";
+      openaiKey.value = localStorage.getItem(STORAGE.openai) || "";
       provider.value = localStorage.getItem(STORAGE.provider) || "";
       verify.checked = localStorage.getItem(STORAGE.verify) === "true";
       refreshBadge();
@@ -233,6 +256,8 @@
 
     function persistSettings() {
       localStorage.setItem(STORAGE.gateway, gatewayKey.value.trim());
+      localStorage.setItem(STORAGE.gemini, geminiKey.value.trim());
+      localStorage.setItem(STORAGE.openai, openaiKey.value.trim());
       localStorage.setItem(STORAGE.provider, provider.value);
       localStorage.setItem(STORAGE.verify, verify.checked ? "true" : "false");
       refreshBadge();
@@ -265,7 +290,12 @@
     });
     clearGatewayKey.addEventListener("click", () => {
       gatewayKey.value = "";
+      geminiKey.value = "";
+      openaiKey.value = "";
       localStorage.removeItem(STORAGE.gateway);
+      localStorage.removeItem(STORAGE.gemini);
+      localStorage.removeItem(STORAGE.openai);
+      sessionStorage.removeItem("navi_access_key");
     });
     provider.addEventListener("change", refreshBadge);
     verify.addEventListener("change", refreshBadge);
@@ -328,6 +358,8 @@
     async function sendMessage() {
       const text = message.value.trim();
       const key = (localStorage.getItem(STORAGE.gateway) || "").trim();
+      const geminiApiKey = (localStorage.getItem(STORAGE.gemini) || "").trim();
+      const openaiApiKey = (localStorage.getItem(STORAGE.openai) || "").trim();
       const preferred = localStorage.getItem(STORAGE.provider) || "";
       const verifyEnabled = localStorage.getItem(STORAGE.verify) === "true";
 
@@ -348,7 +380,9 @@
           method:"POST",
           headers:{
             "Content-Type":"application/json",
-            "Authorization":"Bearer " + key
+            "Authorization":"Bearer " + key,
+            ...(geminiApiKey ? {"X-Gemini-API-Key": geminiApiKey} : {}),
+            ...(openaiApiKey ? {"X-OpenAI-API-Key": openaiApiKey} : {})
           },
           body:JSON.stringify({
             message:text,
