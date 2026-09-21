@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from src.multi_ai_router import route_and_call, shared_context
 from src.notion_writer import NotionWriterError, append_record
-from src.provider_clients import ProviderError, configured_providers
+from src.provider_clients import ProviderError, configured_providers, validate_provider_key
 
 app = FastAPI(title="Navi External Free Region Gateway", version="0.3.0")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
@@ -48,6 +48,11 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
     preferred_provider: str | None = Field(default=None, pattern="^(openai|gemini|copilot)$")
     verify: bool = False
+
+
+class ProviderKeyCheckRequest(BaseModel):
+    provider: str = Field(pattern="^(openai|gemini)$")
+    api_key: str = Field(min_length=1, max_length=500)
 
 
 def _authorize(authorization: str | None, env_name: str) -> None:
@@ -89,6 +94,19 @@ def chat_providers(authorization: str | None = Header(default=None)):
         "providers": configured_providers(),
         "external_free_region": shared_context(),
     }
+
+
+@app.post("/api/provider-key/validate")
+async def provider_key_validate(
+    request: ProviderKeyCheckRequest,
+    authorization: str | None = Header(default=None),
+):
+    _authorize(authorization, "GATEWAY_CHAT_KEY")
+    try:
+        await validate_provider_key(request.provider, request.api_key)
+        return {"valid": True, "provider": request.provider}
+    except ProviderError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/chat")
