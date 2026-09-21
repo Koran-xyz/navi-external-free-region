@@ -134,7 +134,7 @@ async def call_gemini(prompt: str, system: str, api_key: str | None = None) -> d
     }
     async with httpx.AsyncClient(timeout=90.0) as client:
         response = await client.post(
-            "https://generativelanguage.googleapis.com/v1/interactions",
+            "https://generativelanguage.googleapis.com/v1beta/interactions",
             headers={"x-goog-api-key": key, "Content-Type": "application/json"},
             json=payload,
         )
