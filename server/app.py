@@ -8,16 +8,19 @@ from __future__ import annotations
 
 import hmac
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from src.multi_ai_router import route_and_call, shared_context
 from src.notion_writer import NotionWriterError, append_record
 from src.provider_clients import ProviderError, configured_providers
 
-app = FastAPI(title="Navi External Free Region Gateway", version="0.2.0")
+app = FastAPI(title="Navi External Free Region Gateway", version="0.3.0")
+WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 allowed_origin = os.getenv("ALLOWED_ORIGIN", "").strip()
 if allowed_origin:
@@ -58,9 +61,25 @@ def _authorize(authorization: str | None, env_name: str) -> None:
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
+@app.get("/")
+def index():
+    return FileResponse(WEB_DIR / "index.html")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.2.0"}
+    return {"status": "ok", "version": "0.3.0"}
+
+
+@app.get("/api/status")
+def public_status():
+    context = shared_context()
+    return {
+        "status": "ok",
+        "providers": configured_providers(),
+        "meta_rules_status": context.get("meta_rules_status", "unknown"),
+        "project_id": context.get("project_id"),
+    }
 
 
 @app.get("/api/chat/providers")
