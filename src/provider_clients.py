@@ -40,6 +40,10 @@ def _extract_openai_text(data: dict[str, Any]) -> str:
 
 
 def _extract_gemini_text(data: dict[str, Any]) -> str:
+    direct = data.get("output_text")
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+
     chunks: list[str] = []
     for step in data.get("steps", []) or []:
         if step.get("type") != "model_output":
@@ -87,7 +91,7 @@ async def call_gemini(prompt: str, system: str) -> dict[str, Any]:
     if not key:
         raise ProviderError("GEMINI_API_KEY is not configured")
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
+    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
     combined = f"{system}\n\n--- 利用者の依頼 ---\n{prompt}"
     payload = {
         "model": model,
@@ -96,7 +100,7 @@ async def call_gemini(prompt: str, system: str) -> dict[str, Any]:
     }
     async with httpx.AsyncClient(timeout=90.0) as client:
         response = await client.post(
-            "https://generativelanguage.googleapis.com/v1beta/interactions",
+            "https://generativelanguage.googleapis.com/v1/interactions",
             headers={"x-goog-api-key": key, "Content-Type": "application/json"},
             json=payload,
         )
