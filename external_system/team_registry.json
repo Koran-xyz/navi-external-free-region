@@ -1,0 +1,40 @@
+{
+  "schema_version": "0.1",
+  "roles": {
+    "navi": {
+      "type": "courier",
+      "description": "ユーザーと外部作業空間の伝達役。議題登録と結果返却を担当する。"
+    },
+    "admin": {
+      "type": "coordinator",
+      "description": "会議進行、参加チーム調整、再質問、終了判定を担当する。"
+    }
+  },
+  "teams": [
+    {
+      "team_id": "goten_team",
+      "display_name": "ゴテンチーム",
+      "lead": "ゴテン",
+      "additional_agents": 0,
+      "total_agents": 1,
+      "status": "active"
+    },
+    {
+      "team_id": "maria_assistant_team",
+      "display_name": "マリア助手チーム",
+      "lead": "マリア助手",
+      "additional_agents": 4,
+      "total_agents": 5,
+      "status": "active"
+    },
+    {
+      "team_id": "eden_team",
+      "display_name": "エデンチーム",
+      "lead": "エデン",
+      "additional_agents": 4,
+      "total_agents": 5,
+      "status": "active"
+    }
+  ],
+  "total_agents": 11
+}
