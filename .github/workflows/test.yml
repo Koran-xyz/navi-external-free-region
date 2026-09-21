@@ -20,3 +20,5 @@ jobs:
       - run: pytest -q
         env:
           PYTHONPATH: .:src
+      - run: python -c "import yaml; yaml.safe_load(open('render.yaml', encoding='utf-8'))"
+      - run: docker build -t navi-external-free-region:test .
