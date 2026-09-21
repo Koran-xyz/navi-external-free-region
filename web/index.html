@@ -1,421 +1,156 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Navi Multi-AI Chat</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      --bg:#0b0d10; --panel:#14181e; --panel2:#0f1318; --line:#2a313b;
-      --text:#f4f7fb; --muted:#9aa6b4; --accent:#e9eef5; --danger:#ffb4b4;
-    }
-    * { box-sizing:border-box; }
-    html,body { height:100%; }
-    body { margin:0; background:var(--bg); color:var(--text); overflow:hidden; }
-    button,input,select,textarea { font:inherit; }
-    button { cursor:pointer; }
-    .app { height:100dvh; max-width:900px; margin:0 auto; display:flex; flex-direction:column; }
-    .topbar {
-      min-height:58px; padding:10px 14px calc(10px + env(safe-area-inset-top));
-      display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line);
-      background:rgba(11,13,16,.96); backdrop-filter:blur(10px); z-index:5;
-    }
-    .brand { min-width:0; flex:1; }
-    .brand-title { font-size:17px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .brand-sub { margin-top:2px; color:var(--muted); font-size:11px; }
-    .top-actions { display:flex; gap:8px; align-items:center; }
-    .icon-btn {
-      width:40px; height:40px; border:1px solid #384250; border-radius:12px;
-      background:var(--panel); color:var(--text); display:grid; place-items:center; font-size:20px;
-    }
-    .mini-status { display:flex; gap:5px; align-items:center; }
-    .dot { width:8px; height:8px; border-radius:50%; background:#5b6572; }
-    .dot.on { background:#56d38b; }
-    .screen { min-height:0; flex:1; display:none; }
-    .screen.active { display:flex; }
-
-    #chatScreen { flex-direction:column; min-height:0; }
-    .messages {
-      flex:1; min-height:0; overflow-y:auto; padding:18px 14px 20px;
-      scroll-behavior:smooth;
-    }
-    .empty {
-      height:100%; min-height:260px; display:grid; place-items:center; text-align:center;
-      color:var(--muted); padding:30px;
-    }
-    .empty strong { display:block; color:var(--text); font-size:20px; margin-bottom:8px; }
-    .msg { max-width:84%; margin:0 0 14px; }
-    .msg.user { margin-left:auto; }
-    .bubble {
-      border:1px solid var(--line); border-radius:16px; padding:12px 14px;
-      white-space:pre-wrap; word-break:break-word; line-height:1.6;
-    }
-    .user .bubble { background:#202833; }
-    .assistant .bubble { background:var(--panel); }
-    .meta { color:var(--muted); font-size:11px; margin:5px 4px 0; }
-    .error { color:var(--danger); }
-
-    .composer-wrap {
-      border-top:1px solid var(--line); padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-      background:rgba(11,13,16,.98);
-    }
-    .composer {
-      border:1px solid #394453; background:var(--panel2); border-radius:18px; padding:8px;
-    }
-    .composer textarea {
-      width:100%; min-height:54px; max-height:180px; resize:none; border:0; outline:0;
-      background:transparent; color:var(--text); padding:8px 9px; line-height:1.5;
-    }
-    .composer-row { display:flex; gap:8px; align-items:center; }
-    .provider-badge {
-      flex:1; min-width:0; color:var(--muted); font-size:12px; padding:0 8px;
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    }
-    .send-btn {
-      width:auto; min-width:92px; border:0; border-radius:12px; padding:10px 14px;
-      font-weight:800; background:var(--accent); color:#0b0d10;
-    }
-    .send-btn:disabled { opacity:.5; cursor:wait; }
-
-    #settingsScreen { flex-direction:column; overflow-y:auto; padding:16px 14px 40px; }
-    .settings-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
-    .back-btn {
-      width:42px; height:42px; border-radius:12px; border:1px solid #384250;
-      background:var(--panel); color:var(--text); font-size:22px;
-    }
-    .settings-title { font-size:21px; font-weight:800; }
-    .setting-card {
-      background:var(--panel); border:1px solid var(--line); border-radius:16px;
-      padding:14px; margin-bottom:12px;
-    }
-    .setting-card h2 { font-size:15px; margin:0 0 5px; }
-    .setting-card p { color:var(--muted); font-size:12px; margin:0 0 12px; line-height:1.5; }
-    label { display:block; color:#c7d0dc; font-size:12px; margin:10px 0 6px; }
-    input,select {
-      width:100%; border-radius:10px; border:1px solid #394453; background:var(--panel2);
-      color:var(--text); padding:11px;
-    }
-    .check-row { display:flex; align-items:center; gap:10px; padding:8px 0; }
-    .check-row input { width:auto; }
-    .save-btn {
-      width:100%; border:0; border-radius:12px; padding:12px 14px; font-weight:800;
-      background:var(--accent); color:#0b0d10; margin-top:10px;
-    }
-    .provider-status-list { display:grid; gap:8px; }
-    .provider-status {
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-      padding:10px 11px; background:var(--panel2); border:1px solid #303844; border-radius:10px;
-    }
-    .provider-status small { color:var(--muted); }
-    .status-right { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); }
-    .note { color:var(--muted); font-size:11px; line-height:1.5; margin-top:9px; }
-    .danger-btn {
-      width:100%; border:1px solid #594148; border-radius:10px; padding:10px;
-      background:transparent; color:#ffc1c1; margin-top:8px;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Navi Multi-AI Chat</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#0b0d10;--panel:#14181e;--panel2:#0f1318;--line:#2a313b;--text:#f4f7fb;--muted:#9aa6b4;--ok:#76d99c;--bad:#ffb4b4}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--text);overflow:hidden}button,input,select,textarea{font:inherit}.app{height:100dvh;max-width:900px;margin:auto;display:flex;flex-direction:column}
+.topbar{padding:calc(10px + env(safe-area-inset-top)) 12px 10px;display:grid;grid-template-columns:minmax(120px,170px) 1fr 44px;gap:8px;align-items:center;border-bottom:1px solid var(--line);background:#0b0d10}
+#providerTop{width:100%;border:1px solid #384250;border-radius:12px;background:var(--panel);color:var(--text);padding:9px 30px 9px 10px;font-size:13px}
+.brand{text-align:center}.brand b{display:block;font-size:17px}.brand small{color:var(--muted)}.gear{width:42px;height:42px;border:1px solid #384250;border-radius:12px;background:var(--panel);color:var(--text);font-size:20px}
+.screen{display:none;min-height:0;flex:1}.screen.active{display:flex}
+#chatScreen{flex-direction:column}.messages{flex:1;overflow:auto;padding:16px 14px}.empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--muted)}.empty strong{display:block;color:var(--text);font-size:20px;margin-bottom:6px}
+.msg{max-width:86%;margin:0 0 14px}.msg.user{margin-left:auto}.bubble{border:1px solid var(--line);border-radius:16px;padding:12px 14px;white-space:pre-wrap;word-break:break-word;line-height:1.6}.user .bubble{background:#202833}.assistant .bubble{background:var(--panel)}.meta{color:var(--muted);font-size:11px;margin:5px 4px}.error{color:var(--bad)}
+.composer-wrap{border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#0b0d10}.composer{border:1px solid #394453;background:var(--panel2);border-radius:18px;padding:8px}.composer textarea{width:100%;min-height:74px;max-height:190px;resize:none;border:0;outline:0;background:transparent;color:var(--text);padding:8px}.composer-row{display:flex;align-items:center;gap:8px}.mode{flex:1;color:var(--muted);font-size:12px;padding-left:8px}.send{min-width:92px;border:0;border-radius:12px;padding:10px 14px;font-weight:800}.send:disabled{opacity:.5}
+.page{flex-direction:column;overflow:auto;padding:14px 14px 40px}.page-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}.home{border:1px solid #384250;border-radius:12px;background:var(--panel);color:var(--text);padding:10px 13px;font-weight:700}.title{font-size:21px;font-weight:800}.sub{color:var(--muted);font-size:12px;line-height:1.5;margin:-7px 0 14px}
+.list{display:grid;gap:10px}.rowbtn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:16px;color:var(--text);padding:15px}.rowbtn strong{display:block}.rowbtn small{display:block;color:var(--muted);margin-top:4px}.state{font-size:12px;color:var(--muted);white-space:nowrap}.state.ok{color:var(--ok)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:15px;margin-top:12px}.card label{display:block;color:#c7d0dc;font-size:12px;margin-bottom:7px}.keyinput{width:100%;border:1px solid #394453;border-radius:11px;background:var(--panel2);color:var(--text);padding:12px}.save{width:100%;margin-top:12px;border:0;border-radius:12px;padding:12px;font-weight:800}.save-status{min-height:22px;margin-top:10px;font-size:12px;color:var(--muted)}.save-status.ok{color:var(--ok)}.save-status.bad{color:var(--bad)}
+.check{display:flex;align-items:center;gap:10px}.check input{width:auto}
+</style>
 </head>
 <body>
-  <div class="app">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-title">ナビィ</div>
-        <div class="brand-sub" id="headerMode">Multi-AI Chat</div>
-      </div>
-      <div class="mini-status" aria-label="AI接続状態">
-        <span id="openaiDot" class="dot" title="OpenAI"></span>
-        <span id="geminiDot" class="dot" title="Gemini"></span>
-        <span id="copilotDot" class="dot" title="Copilot"></span>
-      </div>
-      <div class="top-actions">
-        <button id="settingsBtn" class="icon-btn" aria-label="設定">⚙︎</button>
-      </div>
-    </header>
+<div class="app">
+<header class="topbar">
+  <select id="providerTop" aria-label="AI切り替え">
+    <option value="">自動</option><option value="openai">OpenAI</option><option value="gemini">Gemini</option><option value="copilot">Copilot</option>
+  </select>
+  <div class="brand"><b>ナビィ</b><small>Multi-AI Chat</small></div>
+  <button id="settingsBtn" class="gear" aria-label="設定">⚙︎</button>
+</header>
 
-    <section id="chatScreen" class="screen active">
-      <div id="messages" class="messages">
-        <div id="emptyState" class="empty">
-          <div>
-            <strong>何をする？</strong>
-            普段の言葉でそのまま相談してください。
-          </div>
-        </div>
-      </div>
+<section id="chatScreen" class="screen active">
+  <div id="messages" class="messages"><div id="emptyState" class="empty"><div><strong>何をする？</strong>普段の言葉でそのまま相談してください。</div></div></div>
+  <div class="composer-wrap"><div class="composer">
+    <textarea id="message" placeholder="ナビィに相談する…" enterkeyhint="send"></textarea>
+    <div class="composer-row"><div id="mode" class="mode">AI: 自動</div><button id="send" class="send">送信</button></div>
+  </div></div>
+</section>
 
-      <div class="composer-wrap">
-        <div class="composer">
-          <textarea id="message" placeholder="ナビィに相談する…" enterkeyhint="send"></textarea>
-          <div class="composer-row">
-            <div id="providerBadge" class="provider-badge">AI: 自動選択</div>
-            <button id="send" class="send-btn">送信</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="settingsScreen" class="screen">
-      <div class="settings-head">
-        <button id="backBtn" class="back-btn" aria-label="戻る">‹</button>
-        <div class="settings-title">設定</div>
-      </div>
-
-      <div class="setting-card">
-        <h2>キー保存</h2>
-        <p>3つを別々の欄に保存します。1つを変更しても、ほかのキーは上書きされません。</p>
-
-        <label for="gatewayKey">① 接続キー — GATEWAY_CHAT_KEY</label>
-        <input id="gatewayKey" type="password" autocomplete="off" placeholder="ナビィに入るための接続キー" />
-
-        <label for="geminiKey">② Gemini — GEMINI_API_KEY</label>
-        <input id="geminiKey" type="password" autocomplete="off" placeholder="Gemini APIキー" />
-
-        <label for="openaiKey">③ OpenAI — OPENAI_API_KEY</label>
-        <input id="openaiKey" type="password" autocomplete="off" placeholder="OpenAI APIキー" />
-
-        <div class="note">この3つはこの端末内で別々に保存します。通信時はHTTPSで送信し、画面には表示しません。</div>
-      </div>
-
-      <div class="setting-card">
-        <h2>AIの使い方</h2>
-        <label for="provider">使うAI</label>
-        <select id="provider">
-          <option value="">自動で選ぶ</option>
-          <option value="openai">OpenAI</option>
-          <option value="gemini">Gemini</option>
-          <option value="copilot">Copilot</option>
-        </select>
-        <label class="check-row">
-          <input id="verify" type="checkbox" />
-          <span>2つ目のAIでも確認する</span>
-        </label>
-      </div>
-
-      <div class="setting-card">
-        <h2>AI接続状態</h2>
-        <p>端末に保存したキー、またはRailway側のキーを使って接続します。</p>
-        <div id="providerStatuses" class="provider-status-list">
-          <div class="provider-status"><span>OpenAI</span><span class="status-right">確認中</span></div>
-          <div class="provider-status"><span>Gemini</span><span class="status-right">確認中</span></div>
-          <div class="provider-status"><span>Copilot</span><span class="status-right">確認中</span></div>
-        </div>
-        <div class="note">各キーは別名で保存されます。GeminiとOpenAIの欄は互いに上書きしません。</div>
-      </div>
-
-      <button id="saveSettings" class="save-btn">3つを別々に保存してチャットに戻る</button>
-      <button id="clearGatewayKey" class="danger-btn">この端末の3つのキーを削除</button>
-    </section>
+<section id="settingsScreen" class="screen page">
+  <div class="page-head"><button class="home" data-home>⌂ ホーム</button><div class="title">設定</div></div>
+  <div class="sub">キーは1つずつ開いて、1つずつ保存します。保存しても勝手に戻りません。</div>
+  <div class="list">
+    <button class="rowbtn" data-key="gateway"><span><strong>接続キー</strong><small>GATEWAY_CHAT_KEY</small></span><span id="gatewayState" class="state">未保存</span></button>
+    <button class="rowbtn" data-key="gemini"><span><strong>Gemini</strong><small>GEMINI_API_KEY</small></span><span id="geminiState" class="state">未保存</span></button>
+    <button class="rowbtn" data-key="openai"><span><strong>OpenAI</strong><small>OPENAI_API_KEY</small></span><span id="openaiState" class="state">未保存</span></button>
   </div>
+  <div class="card"><label class="check"><input id="verify" type="checkbox">2つ目のAIでも確認する</label></div>
+</section>
 
-  <script>
-    const STORAGE = {
-      gateway: "navi.settings.gateway_key",
-      gemini: "navi.settings.gemini_api_key",
-      openai: "navi.settings.openai_api_key",
-      provider: "navi.settings.provider",
-      verify: "navi.settings.verify"
-    };
+<section id="keyScreen" class="screen page">
+  <div class="page-head"><button class="home" data-home>⌂ ホーム</button><div id="keyTitle" class="title">キー保存</div></div>
+  <div id="keyHelp" class="sub"></div>
+  <div class="card">
+    <label id="keyLabel" for="keyInput"></label>
+    <input id="keyInput" class="keyinput" type="password" autocomplete="off">
+    <button id="saveKey" class="save">このキーを保存</button>
+    <div id="saveStatus" class="save-status"></div>
+  </div>
+</section>
+</div>
 
-    const chatScreen = document.getElementById("chatScreen");
-    const settingsScreen = document.getElementById("settingsScreen");
-    const settingsBtn = document.getElementById("settingsBtn");
-    const backBtn = document.getElementById("backBtn");
-    const saveSettings = document.getElementById("saveSettings");
-    const clearGatewayKey = document.getElementById("clearGatewayKey");
-    const gatewayKey = document.getElementById("gatewayKey");
-    const geminiKey = document.getElementById("geminiKey");
-    const openaiKey = document.getElementById("openaiKey");
-    const provider = document.getElementById("provider");
-    const verify = document.getElementById("verify");
-    const providerBadge = document.getElementById("providerBadge");
-    const send = document.getElementById("send");
-    const message = document.getElementById("message");
-    const messages = document.getElementById("messages");
-    const emptyState = document.getElementById("emptyState");
-    const providerStatuses = document.getElementById("providerStatuses");
+<script>
+const S={
+ gateway:"navi.v4.gateway",gemini:"navi.v4.gemini",openai:"navi.v4.openai",
+ geminiOK:"navi.v4.gemini.ok",openaiOK:"navi.v4.openai.ok",
+ provider:"navi.v4.provider",verify:"navi.v4.verify"
+};
+const $=id=>document.getElementById(id);
+let editing=null;
+const meta={
+ gateway:{title:"接続キー",label:"GATEWAY_CHAT_KEY",help:"ナビィの入口キーです。保存時に接続確認します。"},
+ gemini:{title:"Gemini",label:"GEMINI_API_KEY",help:"Gemini専用です。保存時にGoogleへ確認し、有効な時だけ保存します。"},
+ openai:{title:"OpenAI",label:"OPENAI_API_KEY",help:"OpenAI専用です。保存時にOpenAIへ確認し、有効な時だけ保存します。"}
+};
 
-    let providerState = { openai:false, gemini:false, copilot:false };
+function show(id){["chatScreen","settingsScreen","keyScreen"].forEach(x=>$(x).classList.remove("active"));$(id).classList.add("active")}
+function home(){show("chatScreen");$("message").focus()}
+function stored(k){return localStorage.getItem(S[k])||""}
+function verified(k){return k==="gateway"?!!stored("gateway"):localStorage.getItem(S[k+"OK"])==="1"}
+function useKey(k){return verified(k)?stored(k):""}
+function refreshStates(){
+ ["gateway","gemini","openai"].forEach(k=>{
+   const el=$(k+"State"); const ok=verified(k);
+   el.textContent=ok?"保存済み":"未保存"; el.classList.toggle("ok",ok);
+ });
+ const p=localStorage.getItem(S.provider)||"";
+ $("providerTop").value=p;
+ $("verify").checked=localStorage.getItem(S.verify)==="1";
+ const names={"":"自動",openai:"OpenAI",gemini:"Gemini",copilot:"Copilot"};
+ $("mode").textContent="AI: "+names[p]+($("verify").checked?" / 2AI確認":"");
+}
+function openSettings(){refreshStates();show("settingsScreen")}
+function openKey(k){
+ editing=k;$("keyTitle").textContent=meta[k].title;$("keyLabel").textContent=meta[k].label;
+ $("keyHelp").textContent=meta[k].help;$("keyInput").value=stored(k);$("saveStatus").textContent="";
+ $("saveStatus").className="save-status";show("keyScreen");
+}
+async function validateGateway(candidate){
+ const r=await fetch("/api/chat/providers",{headers:{"Authorization":"Bearer "+candidate}});
+ if(!r.ok) throw new Error("接続キーが一致しません");
+}
+async function validateProvider(provider,candidate){
+ const gateway=stored("gateway");
+ if(!gateway) throw new Error("先に接続キーを保存してください");
+ const r=await fetch("/api/provider-key/validate",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+gateway},body:JSON.stringify({provider,api_key:candidate})});
+ const d=await r.json().catch(()=>({}));
+ if(!r.ok) throw new Error(d.detail||"APIキーを確認できません");
+}
+$("saveKey").onclick=async()=>{
+ const v=$("keyInput").value.trim(),st=$("saveStatus");
+ if(!v){st.textContent="キーを入力してください";st.className="save-status bad";return}
+ $("saveKey").disabled=true;st.textContent="確認中…";st.className="save-status";
+ try{
+   if(editing==="gateway") await validateGateway(v); else await validateProvider(editing,v);
+   localStorage.setItem(S[editing],v);
+   if(editing!=="gateway") localStorage.setItem(S[editing+"OK"],"1");
+   st.textContent="保存しました。この画面にそのまま残ります。";st.className="save-status ok";refreshStates();
+ }catch(e){
+   st.textContent="保存していません："+e.message;st.className="save-status bad";
+ }finally{$("saveKey").disabled=false}
+};
+document.querySelectorAll("[data-home]").forEach(b=>b.onclick=home);
+document.querySelectorAll("[data-key]").forEach(b=>b.onclick=()=>openKey(b.dataset.key));
+$("settingsBtn").onclick=openSettings;
+$("providerTop").onchange=()=>{localStorage.setItem(S.provider,$("providerTop").value);refreshStates()};
+$("verify").onchange=()=>{localStorage.setItem(S.verify,$("verify").checked?"1":"0");refreshStates()};
 
-    function migrateOldGatewayKey() {
-      if (!localStorage.getItem(STORAGE.gateway)) {
-        const old = sessionStorage.getItem("navi_access_key");
-        if (old) localStorage.setItem(STORAGE.gateway, old);
-      }
-    }
-
-    function loadSettings() {
-      migrateOldGatewayKey();
-      gatewayKey.value = localStorage.getItem(STORAGE.gateway) || "";
-      geminiKey.value = localStorage.getItem(STORAGE.gemini) || "";
-      openaiKey.value = localStorage.getItem(STORAGE.openai) || "";
-      provider.value = localStorage.getItem(STORAGE.provider) || "";
-      verify.checked = localStorage.getItem(STORAGE.verify) === "true";
-      refreshBadge();
-    }
-
-    function persistSettings() {
-      localStorage.setItem(STORAGE.gateway, gatewayKey.value.trim());
-      localStorage.setItem(STORAGE.gemini, geminiKey.value.trim());
-      localStorage.setItem(STORAGE.openai, openaiKey.value.trim());
-      localStorage.setItem(STORAGE.provider, provider.value);
-      localStorage.setItem(STORAGE.verify, verify.checked ? "true" : "false");
-      refreshBadge();
-    }
-
-    function refreshBadge() {
-      const names = { "":"自動選択", openai:"OpenAI", gemini:"Gemini", copilot:"Copilot" };
-      providerBadge.textContent = "AI: " + (names[provider.value] || "自動選択") + (verify.checked ? " / 2AI確認" : "");
-    }
-
-    function showSettings() {
-      loadSettings();
-      chatScreen.classList.remove("active");
-      settingsScreen.classList.add("active");
-      document.getElementById("headerMode").textContent = "設定";
-    }
-
-    function showChat() {
-      settingsScreen.classList.remove("active");
-      chatScreen.classList.add("active");
-      document.getElementById("headerMode").textContent = "Multi-AI Chat";
-      message.focus();
-    }
-
-    settingsBtn.addEventListener("click", showSettings);
-    backBtn.addEventListener("click", showChat);
-    saveSettings.addEventListener("click", () => {
-      persistSettings();
-      showChat();
-    });
-    clearGatewayKey.addEventListener("click", () => {
-      gatewayKey.value = "";
-      geminiKey.value = "";
-      openaiKey.value = "";
-      localStorage.removeItem(STORAGE.gateway);
-      localStorage.removeItem(STORAGE.gemini);
-      localStorage.removeItem(STORAGE.openai);
-      sessionStorage.removeItem("navi_access_key");
-    });
-    provider.addEventListener("change", refreshBadge);
-    verify.addEventListener("change", refreshBadge);
-
-    function addMessage(role, text, meta = "", isError = false) {
-      if (emptyState) emptyState.remove();
-      const wrap = document.createElement("div");
-      wrap.className = "msg " + role;
-      const bubble = document.createElement("div");
-      bubble.className = "bubble" + (isError ? " error" : "");
-      bubble.textContent = text;
-      wrap.appendChild(bubble);
-      if (meta) {
-        const m = document.createElement("div");
-        m.className = "meta";
-        m.textContent = meta;
-        wrap.appendChild(m);
-      }
-      messages.appendChild(wrap);
-      messages.scrollTop = messages.scrollHeight;
-      return wrap;
-    }
-
-    function setDots(state) {
-      for (const name of ["openai","gemini","copilot"]) {
-        document.getElementById(name + "Dot").classList.toggle("on", !!state[name]);
-      }
-    }
-
-    function renderProviderStatuses() {
-      providerStatuses.textContent = "";
-      for (const name of ["openai","gemini","copilot"]) {
-        const row = document.createElement("div");
-        row.className = "provider-status";
-        const label = document.createElement("span");
-        label.textContent = name === "openai" ? "OpenAI" : name === "gemini" ? "Gemini" : "Copilot";
-        const right = document.createElement("span");
-        right.className = "status-right";
-        const dot = document.createElement("span");
-        dot.className = "dot" + (providerState[name] ? " on" : "");
-        right.appendChild(dot);
-        right.appendChild(document.createTextNode(providerState[name] ? "接続済み" : "未設定"));
-        row.append(label, right);
-        providerStatuses.appendChild(row);
-      }
-    }
-
-    async function loadStatus() {
-      try {
-        const r = await fetch("/api/status");
-        const data = await r.json();
-        providerState = data.providers || providerState;
-        setDots(providerState);
-        renderProviderStatuses();
-      } catch {
-        renderProviderStatuses();
-      }
-    }
-
-    async function sendMessage() {
-      const text = message.value.trim();
-      const key = (localStorage.getItem(STORAGE.gateway) || "").trim();
-      const geminiApiKey = (localStorage.getItem(STORAGE.gemini) || "").trim();
-      const openaiApiKey = (localStorage.getItem(STORAGE.openai) || "").trim();
-      const preferred = localStorage.getItem(STORAGE.provider) || "";
-      const verifyEnabled = localStorage.getItem(STORAGE.verify) === "true";
-
-      if (!text) return;
-      if (!key) {
-        showSettings();
-        gatewayKey.focus();
-        return;
-      }
-
-      addMessage("user", text);
-      message.value = "";
-      send.disabled = true;
-      const loading = addMessage("assistant", "ナビィが処理中…");
-
-      try {
-        const r = await fetch("/api/chat", {
-          method:"POST",
-          headers:{
-            "Content-Type":"application/json",
-            "Authorization":"Bearer " + key,
-            ...(geminiApiKey ? {"X-Gemini-API-Key": geminiApiKey} : {}),
-            ...(openaiApiKey ? {"X-OpenAI-API-Key": openaiApiKey} : {})
-          },
-          body:JSON.stringify({
-            message:text,
-            preferred_provider: preferred || null,
-            verify: verifyEnabled
-          })
-        });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.detail || "HTTP " + r.status);
-
-        loading.remove();
-        const who = data?.navi?.selected_provider || "AI";
-        const verifier = data?.navi?.verifier ? " / 検証: " + data.navi.verifier : "";
-        addMessage("assistant", data.integrated_answer || data?.answer?.text || "", "担当: " + who + verifier);
-      } catch (e) {
-        loading.remove();
-        addMessage("assistant", "エラー: " + e.message, "", true);
-      } finally {
-        send.disabled = false;
-        message.focus();
-      }
-    }
-
-    send.addEventListener("click", sendMessage);
-    message.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    loadSettings();
-    loadStatus();
-  </script>
-</body>
-</html>
+function add(role,text,meta="",err=false){
+ const empty=$("emptyState");if(empty)empty.remove();
+ const w=document.createElement("div");w.className="msg "+role;
+ const b=document.createElement("div");b.className="bubble"+(err?" error":"");b.textContent=text;w.appendChild(b);
+ if(meta){const m=document.createElement("div");m.className="meta";m.textContent=meta;w.appendChild(m)}
+ $("messages").appendChild(w);$("messages").scrollTop=$("messages").scrollHeight;return w
+}
+async function sendMessage(){
+ const text=$("message").value.trim();if(!text)return;
+ const gateway=stored("gateway");if(!gateway){openSettings();return}
+ const preferred=localStorage.getItem(S.provider)||"";const verify=localStorage.getItem(S.verify)==="1";
+ add("user",text);$("message").value="";$("send").disabled=true;const load=add("assistant","ナビィが処理中…");
+ try{
+  const h={"Content-Type":"application/json","Authorization":"Bearer "+gateway};
+  const g=useKey("gemini"),o=useKey("openai");if(g)h["X-Gemini-API-Key"]=g;if(o)h["X-OpenAI-API-Key"]=o;
+  const r=await fetch("/api/chat",{method:"POST",headers:h,body:JSON.stringify({message:text,preferred_provider:preferred||null,verify})});
+  const d=await r.json();if(!r.ok)throw new Error(d.detail||("HTTP "+r.status));
+  load.remove();const who=d?.navi?.selected_provider||"AI";const ver=d?.navi?.verifier?" / 検証: "+d.navi.verifier:"";
+  add("assistant",d.integrated_answer||d?.answer?.text||"","担当: "+who+ver);
+ }catch(e){load.remove();add("assistant","エラー: "+e.message,"",true)}
+ finally{$("send").disabled=false;$("message").focus()}
+}
+$("send").onclick=sendMessage;
+$("message").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}};
+refreshStates();
+</script>
+</body></html>

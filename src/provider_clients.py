@@ -65,6 +65,32 @@ def _extract_gemini_text(data: dict[str, Any]) -> str:
     raise ProviderError("Gemini interaction did not contain text output")
 
 
+async def validate_provider_key(provider: str, api_key: str) -> None:
+    """Validate a provider key without generating chat content."""
+    key = api_key.strip()
+    if not key:
+        raise ProviderError("API key is empty")
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        if provider == "openai":
+            response = await client.get(
+                "https://api.openai.com/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+        elif provider == "gemini":
+            response = await client.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                headers={"x-goog-api-key": key},
+            )
+        else:
+            raise ProviderError(f"unsupported provider: {provider}")
+
+    if response.is_error:
+        if response.status_code in (400, 401, 403):
+            raise ProviderError(f"{provider} API key is invalid")
+        raise ProviderError(f"{provider} key validation failed: HTTP {response.status_code}")
+
+
 async def call_openai(prompt: str, system: str, api_key: str | None = None) -> dict[str, Any]:
     key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
     if not key:
@@ -108,7 +134,7 @@ async def call_gemini(prompt: str, system: str, api_key: str | None = None) -> d
     }
     async with httpx.AsyncClient(timeout=90.0) as client:
         response = await client.post(
-            "https://generativelanguage.googleapis.com/v1/interactions",
+            "https://generativelanguage.googleapis.com/v1beta/interactions",
             headers={"x-goog-api-key": key, "Content-Type": "application/json"},
             json=payload,
         )
