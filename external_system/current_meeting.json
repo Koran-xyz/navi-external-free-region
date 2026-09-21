@@ -1,0 +1,21 @@
+{
+  "meeting_id": "MEETING-0001",
+  "created_at": null,
+  "user_request": "",
+  "mode": "integrated",
+  "participants": [
+    "goten_team",
+    "maria_assistant_team",
+    "eden_team"
+  ],
+  "status": "received",
+  "team_answers": {
+    "goten_team": null,
+    "maria_assistant_team": null,
+    "eden_team": null
+  },
+  "discussion_log": [],
+  "admin_summary": null,
+  "final_result": null,
+  "next_action": null
+}
