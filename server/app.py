@@ -1,4 +1,9 @@
-"""HTTP gateway for browser chat -> Notion append-only writer."""
+"""HTTP gateway for Navi External Free Region.
+
+Endpoints:
+- append-only Notion logging
+- Multi-AI Chat v1 routing
+"""
 from __future__ import annotations
 
 import hmac
@@ -8,9 +13,11 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from src.multi_ai_router import route_and_call, shared_context
 from src.notion_writer import NotionWriterError, append_record
+from src.provider_clients import ProviderError, configured_providers
 
-app = FastAPI(title="Navi External Free Region Gateway", version="0.1.0")
+app = FastAPI(title="Navi External Free Region Gateway", version="0.2.0")
 
 allowed_origin = os.getenv("ALLOWED_ORIGIN", "").strip()
 if allowed_origin:
@@ -34,10 +41,16 @@ class WorkRecord(BaseModel):
     source: str = Field(default="browser-chat / notion-writer", max_length=500)
 
 
-def _authorize(authorization: str | None) -> None:
-    expected = os.getenv("GATEWAY_WRITE_KEY", "").strip()
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=12000)
+    preferred_provider: str | None = Field(default=None, pattern="^(openai|gemini|copilot)$")
+    verify: bool = False
+
+
+def _authorize(authorization: str | None, env_name: str) -> None:
+    expected = os.getenv(env_name, "").strip()
     if not expected:
-        raise HTTPException(status_code=503, detail="gateway key is not configured")
+        raise HTTPException(status_code=503, detail=f"{env_name} is not configured")
 
     prefix = "Bearer "
     supplied = authorization[len(prefix):].strip() if authorization and authorization.startswith(prefix) else ""
@@ -47,12 +60,34 @@ def _authorize(authorization: str | None) -> None:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "version": "0.2.0"}
+
+
+@app.get("/api/chat/providers")
+def chat_providers(authorization: str | None = Header(default=None)):
+    _authorize(authorization, "GATEWAY_CHAT_KEY")
+    return {
+        "providers": configured_providers(),
+        "external_free_region": shared_context(),
+    }
+
+
+@app.post("/api/chat")
+async def chat(request: ChatRequest, authorization: str | None = Header(default=None)):
+    _authorize(authorization, "GATEWAY_CHAT_KEY")
+    try:
+        return await route_and_call(
+            message=request.message,
+            preferred_provider=request.preferred_provider,
+            verify=request.verify,
+        )
+    except ProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.post("/api/notion/log")
 def create_log(record: WorkRecord, authorization: str | None = Header(default=None)):
-    _authorize(authorization)
+    _authorize(authorization, "GATEWAY_WRITE_KEY")
     try:
         return append_record(record.model_dump())
     except NotionWriterError as exc:
