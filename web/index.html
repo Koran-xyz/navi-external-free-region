@@ -197,6 +197,6 @@ async function sendMessage(){
 }
 $("send").onclick=sendMessage;$("message").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}};
 migrateLegacyStorage();
-loadServerStatus();
+migrateLegacyStorage();\nloadServerStatus();
 </script>
 </body></html>
