@@ -2,152 +2,385 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Navi Multi-AI Chat</title>
   <style>
-    :root { color-scheme: dark; font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    body { margin:0; background:#0b0d10; color:#f4f7fb; }
-    .wrap { max-width:860px; margin:0 auto; padding:24px 16px 48px; }
-    .card { background:#14181e; border:1px solid #2a313b; border-radius:16px; padding:16px; margin-bottom:14px; }
-    h1 { font-size:22px; margin:0 0 6px; }
-    .sub { color:#aeb8c5; font-size:14px; }
-    .status { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-    .pill { border:1px solid #384250; border-radius:999px; padding:5px 9px; font-size:12px; }
-    label { display:block; margin:10px 0 6px; font-size:13px; color:#c7d0dc; }
-    input,select,textarea,button { width:100%; box-sizing:border-box; border-radius:10px; border:1px solid #394453; background:#0f1318; color:#f4f7fb; padding:11px; font:inherit; }
-    textarea { min-height:130px; resize:vertical; }
-    button { margin-top:12px; cursor:pointer; background:#f4f7fb; color:#0b0d10; font-weight:700; }
-    button:disabled { opacity:.45; cursor:wait; }
-    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .check { display:flex; gap:8px; align-items:center; margin-top:12px; font-size:14px; }
-    .check input { width:auto; }
-    pre { white-space:pre-wrap; word-break:break-word; margin:0; font:inherit; line-height:1.65; }
-    .small { color:#8f9aaa; font-size:12px; margin-top:7px; }
-    .error { color:#ffb4b4; }
-    @media (max-width:600px){ .row{grid-template-columns:1fr;} }
+    :root {
+      color-scheme: dark;
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      --bg:#0b0d10; --panel:#14181e; --panel2:#0f1318; --line:#2a313b;
+      --text:#f4f7fb; --muted:#9aa6b4; --accent:#e9eef5; --danger:#ffb4b4;
+    }
+    * { box-sizing:border-box; }
+    html,body { height:100%; }
+    body { margin:0; background:var(--bg); color:var(--text); overflow:hidden; }
+    button,input,select,textarea { font:inherit; }
+    button { cursor:pointer; }
+    .app { height:100dvh; max-width:900px; margin:0 auto; display:flex; flex-direction:column; }
+    .topbar {
+      min-height:58px; padding:10px 14px calc(10px + env(safe-area-inset-top));
+      display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line);
+      background:rgba(11,13,16,.96); backdrop-filter:blur(10px); z-index:5;
+    }
+    .brand { min-width:0; flex:1; }
+    .brand-title { font-size:17px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .brand-sub { margin-top:2px; color:var(--muted); font-size:11px; }
+    .top-actions { display:flex; gap:8px; align-items:center; }
+    .icon-btn {
+      width:40px; height:40px; border:1px solid #384250; border-radius:12px;
+      background:var(--panel); color:var(--text); display:grid; place-items:center; font-size:20px;
+    }
+    .mini-status { display:flex; gap:5px; align-items:center; }
+    .dot { width:8px; height:8px; border-radius:50%; background:#5b6572; }
+    .dot.on { background:#56d38b; }
+    .screen { min-height:0; flex:1; display:none; }
+    .screen.active { display:flex; }
+
+    #chatScreen { flex-direction:column; min-height:0; }
+    .messages {
+      flex:1; min-height:0; overflow-y:auto; padding:18px 14px 20px;
+      scroll-behavior:smooth;
+    }
+    .empty {
+      height:100%; min-height:260px; display:grid; place-items:center; text-align:center;
+      color:var(--muted); padding:30px;
+    }
+    .empty strong { display:block; color:var(--text); font-size:20px; margin-bottom:8px; }
+    .msg { max-width:84%; margin:0 0 14px; }
+    .msg.user { margin-left:auto; }
+    .bubble {
+      border:1px solid var(--line); border-radius:16px; padding:12px 14px;
+      white-space:pre-wrap; word-break:break-word; line-height:1.6;
+    }
+    .user .bubble { background:#202833; }
+    .assistant .bubble { background:var(--panel); }
+    .meta { color:var(--muted); font-size:11px; margin:5px 4px 0; }
+    .error { color:var(--danger); }
+
+    .composer-wrap {
+      border-top:1px solid var(--line); padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+      background:rgba(11,13,16,.98);
+    }
+    .composer {
+      border:1px solid #394453; background:var(--panel2); border-radius:18px; padding:8px;
+    }
+    .composer textarea {
+      width:100%; min-height:54px; max-height:180px; resize:none; border:0; outline:0;
+      background:transparent; color:var(--text); padding:8px 9px; line-height:1.5;
+    }
+    .composer-row { display:flex; gap:8px; align-items:center; }
+    .provider-badge {
+      flex:1; min-width:0; color:var(--muted); font-size:12px; padding:0 8px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .send-btn {
+      width:auto; min-width:92px; border:0; border-radius:12px; padding:10px 14px;
+      font-weight:800; background:var(--accent); color:#0b0d10;
+    }
+    .send-btn:disabled { opacity:.5; cursor:wait; }
+
+    #settingsScreen { flex-direction:column; overflow-y:auto; padding:16px 14px 40px; }
+    .settings-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+    .back-btn {
+      width:42px; height:42px; border-radius:12px; border:1px solid #384250;
+      background:var(--panel); color:var(--text); font-size:22px;
+    }
+    .settings-title { font-size:21px; font-weight:800; }
+    .setting-card {
+      background:var(--panel); border:1px solid var(--line); border-radius:16px;
+      padding:14px; margin-bottom:12px;
+    }
+    .setting-card h2 { font-size:15px; margin:0 0 5px; }
+    .setting-card p { color:var(--muted); font-size:12px; margin:0 0 12px; line-height:1.5; }
+    label { display:block; color:#c7d0dc; font-size:12px; margin:10px 0 6px; }
+    input,select {
+      width:100%; border-radius:10px; border:1px solid #394453; background:var(--panel2);
+      color:var(--text); padding:11px;
+    }
+    .check-row { display:flex; align-items:center; gap:10px; padding:8px 0; }
+    .check-row input { width:auto; }
+    .save-btn {
+      width:100%; border:0; border-radius:12px; padding:12px 14px; font-weight:800;
+      background:var(--accent); color:#0b0d10; margin-top:10px;
+    }
+    .provider-status-list { display:grid; gap:8px; }
+    .provider-status {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:10px 11px; background:var(--panel2); border:1px solid #303844; border-radius:10px;
+    }
+    .provider-status small { color:var(--muted); }
+    .status-right { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); }
+    .note { color:var(--muted); font-size:11px; line-height:1.5; margin-top:9px; }
+    .danger-btn {
+      width:100%; border:1px solid #594148; border-radius:10px; padding:10px;
+      background:transparent; color:#ffc1c1; margin-top:8px;
+    }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <section class="card">
-      <h1>ナビィ — Multi-AI Chat v1</h1>
-      <div class="sub">1つの窓口から、利用可能なAIへ振り分けます。</div>
-      <div id="status" class="status"><span class="pill">状態確認中…</span></div>
-    </section>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-title">ナビィ</div>
+        <div class="brand-sub" id="headerMode">Multi-AI Chat</div>
+      </div>
+      <div class="mini-status" aria-label="AI接続状態">
+        <span id="openaiDot" class="dot" title="OpenAI"></span>
+        <span id="geminiDot" class="dot" title="Gemini"></span>
+        <span id="copilotDot" class="dot" title="Copilot"></span>
+      </div>
+      <div class="top-actions">
+        <button id="settingsBtn" class="icon-btn" aria-label="設定">⚙︎</button>
+      </div>
+    </header>
 
-    <section class="card">
-      <div class="row">
-        <div>
-          <label for="provider">使うAI</label>
-          <select id="provider">
-            <option value="">自動で選ぶ</option>
-            <option value="openai">OpenAI</option>
-            <option value="gemini">Gemini</option>
-            <option value="copilot">Copilot</option>
-          </select>
-        </div>
-        <div>
-          <label for="accessKey">接続キー</label>
-          <input id="accessKey" type="password" autocomplete="off" placeholder="Railway側の GATEWAY_CHAT_KEY" />
-          <div class="small">キーはこのタブの一時保存だけに保持します。</div>
+    <section id="chatScreen" class="screen active">
+      <div id="messages" class="messages">
+        <div id="emptyState" class="empty">
+          <div>
+            <strong>何をする？</strong>
+            普段の言葉でそのまま相談してください。
+          </div>
         </div>
       </div>
 
-      <label for="message">相談内容</label>
-      <textarea id="message" placeholder="例：この仕様を調べて、実装案を作って"></textarea>
-
-      <label class="check">
-        <input id="verify" type="checkbox" />
-        2つ目のAIでも確認する
-      </label>
-
-      <button id="send">ナビィに相談する</button>
+      <div class="composer-wrap">
+        <div class="composer">
+          <textarea id="message" placeholder="ナビィに相談する…" enterkeyhint="send"></textarea>
+          <div class="composer-row">
+            <div id="providerBadge" class="provider-badge">AI: 自動選択</div>
+            <button id="send" class="send-btn">送信</button>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="card">
-      <label>回答</label>
-      <pre id="answer">まだ相談していません。</pre>
+    <section id="settingsScreen" class="screen">
+      <div class="settings-head">
+        <button id="backBtn" class="back-btn" aria-label="戻る">‹</button>
+        <div class="settings-title">設定</div>
+      </div>
+
+      <div class="setting-card">
+        <h2>この端末の接続キー</h2>
+        <p>チャット画面から分離して保存します。ここで一度入れれば、毎回入力しなくて済みます。</p>
+        <label for="gatewayKey">GATEWAY_CHAT_KEY</label>
+        <input id="gatewayKey" type="password" autocomplete="off" placeholder="Railwayに保存した接続キー" />
+      </div>
+
+      <div class="setting-card">
+        <h2>AIの使い方</h2>
+        <label for="provider">使うAI</label>
+        <select id="provider">
+          <option value="">自動で選ぶ</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Gemini</option>
+          <option value="copilot">Copilot</option>
+        </select>
+        <label class="check-row">
+          <input id="verify" type="checkbox" />
+          <span>2つ目のAIでも確認する</span>
+        </label>
+      </div>
+
+      <div class="setting-card">
+        <h2>AI接続状態</h2>
+        <p>APIキーそのものはブラウザに保存しません。OpenAI / GeminiのキーはRailway側で別々に保存します。</p>
+        <div id="providerStatuses" class="provider-status-list">
+          <div class="provider-status"><span>OpenAI</span><span class="status-right">確認中</span></div>
+          <div class="provider-status"><span>Gemini</span><span class="status-right">確認中</span></div>
+          <div class="provider-status"><span>Copilot</span><span class="status-right">確認中</span></div>
+        </div>
+        <div class="note">ここでは接続状態だけ確認します。APIキー同士が同じ欄で上書きされることはありません。</div>
+      </div>
+
+      <button id="saveSettings" class="save-btn">保存してチャットに戻る</button>
+      <button id="clearGatewayKey" class="danger-btn">この端末の接続キーを削除</button>
     </section>
-  </main>
+  </div>
 
   <script>
-    const statusEl = document.getElementById("status");
+    const STORAGE = {
+      gateway: "navi.settings.gateway_key",
+      provider: "navi.settings.provider",
+      verify: "navi.settings.verify"
+    };
+
+    const chatScreen = document.getElementById("chatScreen");
+    const settingsScreen = document.getElementById("settingsScreen");
+    const settingsBtn = document.getElementById("settingsBtn");
+    const backBtn = document.getElementById("backBtn");
+    const saveSettings = document.getElementById("saveSettings");
+    const clearGatewayKey = document.getElementById("clearGatewayKey");
+    const gatewayKey = document.getElementById("gatewayKey");
+    const provider = document.getElementById("provider");
+    const verify = document.getElementById("verify");
+    const providerBadge = document.getElementById("providerBadge");
     const send = document.getElementById("send");
-    const answer = document.getElementById("answer");
-    const keyInput = document.getElementById("accessKey");
+    const message = document.getElementById("message");
+    const messages = document.getElementById("messages");
+    const emptyState = document.getElementById("emptyState");
+    const providerStatuses = document.getElementById("providerStatuses");
 
-    keyInput.value = sessionStorage.getItem("navi_access_key") || "";
-    keyInput.addEventListener("input", () => {
-      sessionStorage.setItem("navi_access_key", keyInput.value);
+    let providerState = { openai:false, gemini:false, copilot:false };
+
+    function loadSettings() {
+      gatewayKey.value = localStorage.getItem(STORAGE.gateway) || "";
+      provider.value = localStorage.getItem(STORAGE.provider) || "";
+      verify.checked = localStorage.getItem(STORAGE.verify) === "true";
+      refreshBadge();
+    }
+
+    function persistSettings() {
+      localStorage.setItem(STORAGE.gateway, gatewayKey.value.trim());
+      localStorage.setItem(STORAGE.provider, provider.value);
+      localStorage.setItem(STORAGE.verify, verify.checked ? "true" : "false");
+      refreshBadge();
+    }
+
+    function refreshBadge() {
+      const names = { "":"自動選択", openai:"OpenAI", gemini:"Gemini", copilot:"Copilot" };
+      providerBadge.textContent = "AI: " + (names[provider.value] || "自動選択") + (verify.checked ? " / 2AI確認" : "");
+    }
+
+    function showSettings() {
+      loadSettings();
+      chatScreen.classList.remove("active");
+      settingsScreen.classList.add("active");
+      document.getElementById("headerMode").textContent = "設定";
+    }
+
+    function showChat() {
+      settingsScreen.classList.remove("active");
+      chatScreen.classList.add("active");
+      document.getElementById("headerMode").textContent = "Multi-AI Chat";
+      message.focus();
+    }
+
+    settingsBtn.addEventListener("click", showSettings);
+    backBtn.addEventListener("click", showChat);
+    saveSettings.addEventListener("click", () => {
+      persistSettings();
+      showChat();
     });
+    clearGatewayKey.addEventListener("click", () => {
+      gatewayKey.value = "";
+      localStorage.removeItem(STORAGE.gateway);
+    });
+    provider.addEventListener("change", refreshBadge);
+    verify.addEventListener("change", refreshBadge);
 
-    function pill(text) {
-      const span = document.createElement("span");
-      span.className = "pill";
-      span.textContent = text;
-      return span;
+    function addMessage(role, text, meta = "", isError = false) {
+      if (emptyState) emptyState.remove();
+      const wrap = document.createElement("div");
+      wrap.className = "msg " + role;
+      const bubble = document.createElement("div");
+      bubble.className = "bubble" + (isError ? " error" : "");
+      bubble.textContent = text;
+      wrap.appendChild(bubble);
+      if (meta) {
+        const m = document.createElement("div");
+        m.className = "meta";
+        m.textContent = meta;
+        wrap.appendChild(m);
+      }
+      messages.appendChild(wrap);
+      messages.scrollTop = messages.scrollHeight;
+      return wrap;
+    }
+
+    function setDots(state) {
+      for (const name of ["openai","gemini","copilot"]) {
+        document.getElementById(name + "Dot").classList.toggle("on", !!state[name]);
+      }
+    }
+
+    function renderProviderStatuses() {
+      providerStatuses.textContent = "";
+      for (const name of ["openai","gemini","copilot"]) {
+        const row = document.createElement("div");
+        row.className = "provider-status";
+        const label = document.createElement("span");
+        label.textContent = name === "openai" ? "OpenAI" : name === "gemini" ? "Gemini" : "Copilot";
+        const right = document.createElement("span");
+        right.className = "status-right";
+        const dot = document.createElement("span");
+        dot.className = "dot" + (providerState[name] ? " on" : "");
+        right.appendChild(dot);
+        right.appendChild(document.createTextNode(providerState[name] ? "接続済み" : "未設定"));
+        row.append(label, right);
+        providerStatuses.appendChild(row);
+      }
     }
 
     async function loadStatus() {
       try {
         const r = await fetch("/api/status");
         const data = await r.json();
-        statusEl.textContent = "";
-        for (const [name, ready] of Object.entries(data.providers || {})) {
-          statusEl.appendChild(pill(name + ": " + (ready ? "接続済み" : "未設定")));
-        }
-        statusEl.appendChild(pill("メタルール: " + (data.meta_rules_status || "不明")));
+        providerState = data.providers || providerState;
+        setDots(providerState);
+        renderProviderStatuses();
       } catch {
-        statusEl.textContent = "";
-        statusEl.appendChild(pill("状態取得エラー"));
+        renderProviderStatuses();
       }
     }
 
-    send.addEventListener("click", async () => {
-      const message = document.getElementById("message").value.trim();
-      const preferred = document.getElementById("provider").value || null;
-      const verify = document.getElementById("verify").checked;
-      const key = keyInput.value.trim();
+    async function sendMessage() {
+      const text = message.value.trim();
+      const key = (localStorage.getItem(STORAGE.gateway) || "").trim();
+      const preferred = localStorage.getItem(STORAGE.provider) || "";
+      const verifyEnabled = localStorage.getItem(STORAGE.verify) === "true";
 
-      if (!message) {
-        answer.textContent = "相談内容を入力してください。";
-        return;
-      }
+      if (!text) return;
       if (!key) {
-        answer.textContent = "接続キーを入力してください。";
+        showSettings();
+        gatewayKey.focus();
         return;
       }
 
+      addMessage("user", text);
+      message.value = "";
       send.disabled = true;
-      answer.className = "";
-      answer.textContent = "ナビィが処理中…";
+      const loading = addMessage("assistant", "ナビィが処理中…");
+
       try {
         const r = await fetch("/api/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + key
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json",
+            "Authorization":"Bearer " + key
           },
-          body: JSON.stringify({
-            message,
-            preferred_provider: preferred,
-            verify
+          body:JSON.stringify({
+            message:text,
+            preferred_provider: preferred || null,
+            verify: verifyEnabled
           })
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || "HTTP " + r.status);
 
+        loading.remove();
         const who = data?.navi?.selected_provider || "AI";
         const verifier = data?.navi?.verifier ? " / 検証: " + data.navi.verifier : "";
-        answer.textContent = "担当: " + who + verifier + "\n\n" + (data.integrated_answer || data?.answer?.text || "");
+        addMessage("assistant", data.integrated_answer || data?.answer?.text || "", "担当: " + who + verifier);
       } catch (e) {
-        answer.className = "error";
-        answer.textContent = "エラー: " + e.message;
+        loading.remove();
+        addMessage("assistant", "エラー: " + e.message, "", true);
       } finally {
         send.disabled = false;
+        message.focus();
+      }
+    }
+
+    send.addEventListener("click", sendMessage);
+    message.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
       }
     });
 
+    loadSettings();
     loadStatus();
   </script>
 </body>
