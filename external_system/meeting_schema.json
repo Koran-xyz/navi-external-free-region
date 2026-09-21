@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Navi External System Meeting",
+  "type": "object",
+  "required": [
+    "meeting_id",
+    "user_request",
+    "mode",
+    "participants",
+    "status",
+    "team_answers"
+  ],
+  "properties": {
+    "meeting_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "user_request": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "integrated",
+        "parallel"
+      ]
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "goten_team",
+          "maria_assistant_team",
+          "eden_team"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "received",
+        "discussing",
+        "admin_review",
+        "completed",
+        "hold"
+      ]
+    },
+    "team_answers": {
+      "type": "object",
+      "properties": {
+        "goten_team": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maria_assistant_team": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eden_team": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "discussion_log": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "admin_summary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "final_result": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "next_action": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

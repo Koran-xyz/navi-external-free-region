@@ -1,0 +1,15 @@
+{
+  "version": "0.1",
+  "notion": {
+    "meeting_base": "https://app.notion.com/p/3e2aba2f4ea681f090bcf11f531da4c7?pvs=204",
+    "parent_joint_room": "https://app.notion.com/p/3d9aba2f4ea6817cb258db3c0259a92c?pvs=204"
+  },
+  "google_drive": {
+    "folder": "https://drive.google.com/drive/folders/1KGZ5BIBoPkElG2Z09U81r47lvwFQhoMy",
+    "meeting_log_doc": "https://docs.google.com/document/d/1HpK3TiwZ2GEGHVf5IG_Ure73rVI0SPLOvyoQ9ruccs0/edit"
+  },
+  "github": {
+    "repo": "https://github.com/Koran-xyz/navi-external-free-region",
+    "path": "external_system/"
+  }
+}
