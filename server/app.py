@@ -13,15 +13,18 @@ from pathlib import Path
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.multi_ai_router import route_and_call, shared_context
 from src.notion_writer import NotionWriterError, append_record
 from src.provider_clients import ProviderError, configured_providers, validate_provider_key
 from src.robot_gateway import RobotError, execute_robot_job, robot_status
+from src.cafe_gateway import create_table as cafe_create_table, get_table as cafe_get_table, list_messages as cafe_list_messages, list_tables as cafe_list_tables, post_message as cafe_post_message
 
-app = FastAPI(title="Navi External Free Region Gateway", version="0.4.0")
+app = FastAPI(title="Navi External Free Region Gateway", version="0.5.0")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
+CAFE_DIR = Path(__file__).resolve().parents[1] / "multi_ai_portal" / "public"
 
 allowed_origin = os.getenv("ALLOWED_ORIGIN", "").strip()
 if allowed_origin:
@@ -54,6 +57,18 @@ class ChatRequest(BaseModel):
 class ProviderKeyCheckRequest(BaseModel):
     provider: str = Field(pattern="^(openai|gemini)$")
     api_key: str = Field(min_length=1, max_length=500)
+
+
+class CafeTableCreateRequest(BaseModel):
+    title: str = Field(default="無題のテーブル", max_length=80)
+    password: str = Field(min_length=4, max_length=64)
+    expires_in_hours: int = 72
+
+
+class CafeMessageRequest(BaseModel):
+    display_name: str = Field(default="参加者", max_length=60)
+    actor_type: str = Field(default="other", max_length=30)
+    body: str = Field(min_length=1, max_length=8000)
 
 
 class RobotJobRequest(BaseModel):
@@ -90,7 +105,79 @@ def index():
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.4.0"}
+    return {"status": "ok", "version": "0.5.0"}
+
+
+@app.get("/api/tables")
+def cafe_tables():
+    return {"ok": True, "tables": cafe_list_tables()}
+
+
+@app.post("/api/tables", status_code=201)
+def cafe_table_create(request: CafeTableCreateRequest):
+    try:
+        table = cafe_create_table(
+            title=request.title,
+            password=request.password,
+            expires_in_hours=request.expires_in_hours,
+        )
+        return {"ok": True, "table": table}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _cafe_error(exc: Exception) -> HTTPException:
+    message = str(exc).strip("'")
+    if isinstance(exc, PermissionError):
+        return HTTPException(status_code=403, detail=message)
+    if isinstance(exc, KeyError):
+        return HTTPException(status_code=404, detail=message)
+    return HTTPException(status_code=400, detail=message)
+
+
+@app.get("/api/tables/{room_id}")
+def cafe_table_info(
+    room_id: str,
+    x_table_password: str | None = Header(default=None, alias="X-Table-Password"),
+):
+    try:
+        return {"ok": True, "table": cafe_get_table(room_id, x_table_password or "")}
+    except (PermissionError, KeyError, ValueError) as exc:
+        raise _cafe_error(exc) from exc
+
+
+@app.get("/api/tables/{room_id}/messages")
+def cafe_messages(
+    room_id: str,
+    after: int = 0,
+    x_table_password: str | None = Header(default=None, alias="X-Table-Password"),
+):
+    try:
+        return {
+            "ok": True,
+            "messages": cafe_list_messages(room_id, x_table_password or "", after),
+        }
+    except (PermissionError, KeyError, ValueError) as exc:
+        raise _cafe_error(exc) from exc
+
+
+@app.post("/api/tables/{room_id}/messages", status_code=201)
+def cafe_message_post(
+    room_id: str,
+    request: CafeMessageRequest,
+    x_table_password: str | None = Header(default=None, alias="X-Table-Password"),
+):
+    try:
+        message = cafe_post_message(
+            room_id=room_id,
+            password=x_table_password or "",
+            display_name=request.display_name,
+            actor_type=request.actor_type,
+            body=request.body,
+        )
+        return {"ok": True, "message": message}
+    except (PermissionError, KeyError, ValueError) as exc:
+        raise _cafe_error(exc) from exc
 
 
 @app.get("/api/status")
@@ -181,3 +268,7 @@ def create_log(record: WorkRecord, authorization: str | None = Header(default=No
         return append_record(record.model_dump())
     except NotionWriterError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# AI Cafe UI. Keep this mount last so API routes remain authoritative.
+app.mount("/cafe", StaticFiles(directory=CAFE_DIR, html=True), name="ai-cafe")
