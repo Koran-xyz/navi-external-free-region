@@ -1,0 +1,15 @@
+name = "navi-multi-ai-portal"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[assets]
+directory = "../public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "navi-multi-ai-portal"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+PORTAL_VERSION = "0.1.0"
