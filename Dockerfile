@@ -14,6 +14,7 @@ COPY rules ./rules
 COPY external_system ./external_system
 COPY external_robots ./external_robots
 COPY multi_ai_portal ./multi_ai_portal
+COPY board ./board
 COPY META_RULES.md RULES.md ./
 
 ENV PYTHONDONTWRITEBYTECODE=1
