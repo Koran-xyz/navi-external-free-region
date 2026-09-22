@@ -20,5 +20,7 @@ jobs:
       - run: pytest -q
         env:
           PYTHONPATH: .:src
+      - run: node --check multi_ai_portal/worker/src/index.js
+      - run: node --check multi_ai_portal/public/app.js
       - run: python -c "import yaml; yaml.safe_load(open('render.yaml', encoding='utf-8'))"
       - run: docker build -t navi-external-free-region:test .
