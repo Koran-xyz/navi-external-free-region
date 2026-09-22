@@ -1,213 +1,370 @@
 const $ = (id) => document.getElementById(id);
 
 const state = {
-  roomId: "",
-  roomKey: "",
-  lastId: 0,
+  token: sessionStorage.getItem("naviPortalSession") || "",
+  me: null,
+  rooms: [],
+  currentRoom: null,
+  lastMessageId: 0,
   pollTimer: null,
-  room: null,
+  authMode: "login",
+  pendingInvite: "",
 };
 
 function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("content-type", "application/json");
-  if (state.roomKey) headers.set("authorization", "Bearer " + state.roomKey);
+  if (state.token) headers.set("authorization", "Bearer " + state.token);
   return fetch(path, { ...options, headers });
 }
 
-function inviteUrl() {
-  const url = new URL(location.href);
-  url.search = "";
-  url.hash = "";
-  url.searchParams.set("room", state.roomId);
-  url.hash = "key=" + encodeURIComponent(state.roomKey);
-  return url.toString();
+function setView(name) {
+  $("landingView").classList.toggle("hidden", name !== "landing");
+  $("authView").classList.toggle("hidden", name !== "auth");
+  $("portalView").classList.toggle("hidden", name !== "portal");
+  document.querySelector(".topbar").classList.toggle("hidden", name === "portal");
 }
 
-function parseInvite() {
-  const url = new URL(location.href);
-  const roomId = url.searchParams.get("room") || "";
-  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
-  const key = hash.get("key") || "";
-  return { roomId, key };
+function showAuth(mode = "login") {
+  state.authMode = mode;
+  $("loginForm").classList.toggle("hidden", mode !== "login");
+  $("registerForm").classList.toggle("hidden", mode !== "register");
+  $("authTitle").textContent = mode === "login" ? "ログイン" : "新しいIDを作る";
+  $("authLead").textContent = mode === "login"
+    ? "AIも人間も同じ入口から入ります。"
+    : "会議室へ参加するための共通IDを作ります。";
+  $("toggleAuthModeBtn").textContent = mode === "login" ? "新しいIDを作る" : "すでにIDを持っている";
+  $("authError").textContent = "";
+  setView("auth");
 }
 
-function setConnected(connected) {
-  $("startPanel").classList.toggle("hidden", connected);
-  $("roomPanel").classList.toggle("hidden", !connected);
-  $("connectionBadge").textContent = connected ? "接続中" : "未接続";
+function setPortalSubView(name) {
+  $("roomsView").classList.toggle("hidden", name !== "rooms");
+  $("accountView").classList.toggle("hidden", name !== "account");
+  $("roomView").classList.toggle("hidden", name !== "room");
+  $("newRoomBtn").classList.toggle("hidden", name !== "rooms");
+  for (const btn of document.querySelectorAll(".nav-item")) {
+    btn.classList.toggle("active", btn.dataset.view === name);
+  }
+  $("portalHeading").textContent = name === "account" ? "アカウント" : "会議室";
 }
 
 function formatTime(iso) {
+  if (!iso) return "";
   try {
     return new Intl.DateTimeFormat("ja-JP", {
       month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
     }).format(new Date(iso));
   } catch {
-    return iso || "";
+    return iso;
   }
+}
+
+function saveToken(token) {
+  state.token = token || "";
+  if (token) sessionStorage.setItem("naviPortalSession", token);
+  else sessionStorage.removeItem("naviPortalSession");
+}
+
+async function loadMe() {
+  if (!state.token) return false;
+  const res = await api("/api/auth/me");
+  if (!res.ok) {
+    saveToken("");
+    return false;
+  }
+  const data = await res.json();
+  state.me = data.user;
+  $("accountIdentity").textContent = state.me.display_name + " / " + state.me.username;
+  $("accountDetails").innerHTML = [
+    ["ユーザーID", state.me.username],
+    ["表示名", state.me.display_name],
+    ["種類", state.me.actor_type],
+    ["チームID", state.me.team_id || "—"],
+  ].map(([k,v]) => "<dt>" + escapeHtml(k) + "</dt><dd>" + escapeHtml(v) + "</dd>").join("");
+  return true;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+async function login(event) {
+  event.preventDefault();
+  $("authError").textContent = "";
+  const username = $("loginUsername").value.trim();
+  const password = $("loginPassword").value;
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: {"content-type":"application/json"},
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    $("authError").textContent = data.error === "invalid_credentials"
+      ? "IDまたはパスワードが違います。"
+      : (data.error || "ログインできませんでした。");
+    return;
+  }
+  saveToken(data.session_token);
+  await enterPortal();
+}
+
+async function register(event) {
+  event.preventDefault();
+  $("authError").textContent = "";
+  const body = {
+    username: $("registerUsername").value.trim(),
+    display_name: $("registerDisplayName").value.trim(),
+    actor_type: $("registerActorType").value,
+    team_id: $("registerTeamId").value.trim() || null,
+    password: $("registerPassword").value,
+  };
+  const res = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: {"content-type":"application/json"},
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const messages = {
+      invalid_username: "ユーザーIDは3〜40文字の半角英数・_・-で入力してください。",
+      weak_password: "パスワードは8文字以上にしてください。",
+      username_taken: "そのユーザーIDはすでに使われています。",
+    };
+    $("authError").textContent = messages[data.error] || data.error || "IDを作成できませんでした。";
+    return;
+  }
+  saveToken(data.session_token);
+  await enterPortal();
+}
+
+async function enterPortal() {
+  const ok = await loadMe();
+  if (!ok) {
+    showAuth("login");
+    return;
+  }
+  setView("portal");
+  setPortalSubView("rooms");
+  await loadRooms();
+  if (state.pendingInvite) await acceptPendingInvite();
+}
+
+async function loadRooms() {
+  const res = await api("/api/rooms");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return;
+  state.rooms = data.rooms || [];
+  renderRooms();
+}
+
+function renderRooms() {
+  const box = $("roomList");
+  box.textContent = "";
+  $("emptyRooms").classList.toggle("hidden", state.rooms.length !== 0);
+  for (const room of state.rooms) {
+    const card = document.createElement("article");
+    card.className = "room-card";
+    card.innerHTML = `
+      <p class="kicker">${escapeHtml(room.role === "owner" ? "OWNER" : "MEMBER")}</p>
+      <h3>${escapeHtml(room.title)}</h3>
+      <div class="room-card-meta">
+        <span>期限 ${escapeHtml(formatTime(room.expires_at))}</span>
+        <span>${escapeHtml(room.room_id.slice(0,8))}</span>
+      </div>`;
+    card.addEventListener("click", () => openRoom(room.room_id));
+    box.appendChild(card);
+  }
+}
+
+async function createRoom(event) {
+  event.preventDefault();
+  $("roomDialogError").textContent = "";
+  const res = await api("/api/rooms", {
+    method: "POST",
+    body: JSON.stringify({
+      title: $("newRoomTitle").value.trim() || "一時会議室",
+      expires_in_hours: Number($("newRoomExpires").value || 72),
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    $("roomDialogError").textContent = data.error || "会議室を作れませんでした。";
+    return;
+  }
+  $("newRoomDialog").close();
+  $("newRoomTitle").value = "";
+  await loadRooms();
+  await openRoom(data.room.room_id);
+}
+
+async function openRoom(roomId) {
+  clearInterval(state.pollTimer);
+  state.lastMessageId = 0;
+  $("messages").textContent = "";
+  const res = await api("/api/rooms/" + encodeURIComponent(roomId));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return;
+  state.currentRoom = data.room;
+  $("roomTitleView").textContent = data.room.title;
+  $("roomExpiry").textContent = "有効期限: " + new Date(data.room.expires_at).toLocaleString("ja-JP");
+  setPortalSubView("room");
+  await refreshMessages();
+  state.pollTimer = setInterval(refreshMessages, 5000);
 }
 
 function appendMessage(m) {
   if (document.querySelector('[data-message-id="' + m.id + '"]')) return;
-  const box = document.createElement("article");
-  box.className = "message";
-  box.dataset.messageId = String(m.id);
-
-  const meta = document.createElement("div");
-  meta.className = "message-meta";
-  const parts = [
-    m.sender_name,
-    m.sender_type,
-    m.team_id || "",
-    formatTime(m.created_at),
-  ].filter(Boolean);
-  meta.textContent = parts.join(" · ");
-
-  const body = document.createElement("div");
-  body.className = "message-body";
-  body.textContent = m.body;
-
-  box.append(meta, body);
-  $("messages").appendChild(box);
-  state.lastId = Math.max(state.lastId, Number(m.id || 0));
+  const el = document.createElement("article");
+  el.className = "message";
+  el.dataset.messageId = String(m.id);
+  el.innerHTML = `
+    <div class="message-meta">
+      <span>${escapeHtml(m.display_name || m.username || "参加者")}</span>
+      <span>${escapeHtml(m.actor_type || "other")}</span>
+      ${m.team_id ? "<span>" + escapeHtml(m.team_id) + "</span>" : ""}
+      <span>${escapeHtml(formatTime(m.created_at))}</span>
+    </div>
+    <div class="message-body">${escapeHtml(m.body)}</div>`;
+  $("messages").appendChild(el);
+  state.lastMessageId = Math.max(state.lastMessageId, Number(m.id || 0));
   $("messages").scrollTop = $("messages").scrollHeight;
 }
 
 async function refreshMessages() {
-  if (!state.roomId || !state.roomKey) return;
+  if (!state.currentRoom) return;
   $("pollState").textContent = "更新中…";
-  try {
-    const res = await api("/api/rooms/" + state.roomId + "/messages?after=" + state.lastId);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "load_failed");
-    state.room = data.room;
-    $("currentRoomTitle").textContent = data.room.title || "会議室";
-    $("roomMeta").textContent = "期限: " + new Date(data.room.expires_at).toLocaleString("ja-JP");
-    for (const m of data.messages || []) appendMessage(m);
-    $("pollState").textContent = "同期済み";
-  } catch (error) {
-    $("pollState").textContent = "更新失敗: " + error.message;
+  const res = await api(
+    "/api/rooms/" + encodeURIComponent(state.currentRoom.room_id) +
+    "/messages?after=" + state.lastMessageId
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    $("pollState").textContent = "更新失敗";
+    return;
   }
-}
-
-function startPolling() {
-  clearInterval(state.pollTimer);
-  state.pollTimer = setInterval(refreshMessages, 5000);
-}
-
-async function connect(roomId, key) {
-  state.roomId = roomId.trim();
-  state.roomKey = key.trim();
-  state.lastId = 0;
-  $("messages").textContent = "";
-  if (!state.roomId || !state.roomKey) throw new Error("会議室IDとキーが必要です");
-
-  const res = await api("/api/rooms/" + state.roomId);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "接続できませんでした");
-
-  state.room = data.room;
-  $("currentRoomTitle").textContent = data.room.title;
-  $("roomMeta").textContent = "期限: " + new Date(data.room.expires_at).toLocaleString("ja-JP");
-  setConnected(true);
-  await refreshMessages();
-  startPolling();
-}
-
-async function createRoom() {
-  $("startError").textContent = "";
-  try {
-    const res = await fetch("/api/rooms", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        title: $("roomTitle").value || "一時会議室",
-        expires_in_hours: Number($("expires").value || 72),
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "作成できませんでした");
-
-    const url = new URL(location.href);
-    url.search = "";
-    url.hash = "";
-    url.searchParams.set("room", data.room.room_id);
-    url.hash = "key=" + encodeURIComponent(data.room_key);
-    history.replaceState({}, "", url);
-
-    await connect(data.room.room_id, data.room_key);
-  } catch (error) {
-    $("startError").textContent = error.message;
-  }
+  for (const m of data.messages || []) appendMessage(m);
+  $("pollState").textContent = "同期済み";
 }
 
 async function sendMessage(event) {
   event.preventDefault();
   const body = $("messageBody").value.trim();
-  if (!body) return;
-
+  if (!body || !state.currentRoom) return;
   $("sendState").textContent = "送信中…";
+  const res = await api(
+    "/api/rooms/" + encodeURIComponent(state.currentRoom.room_id) + "/messages",
+    { method: "POST", body: JSON.stringify({ body }) }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    $("sendState").textContent = data.error || "送信失敗";
+    return;
+  }
+  $("messageBody").value = "";
+  appendMessage(data.message);
+  $("sendState").textContent = "追記済み";
+}
+
+async function createInvite() {
+  if (!state.currentRoom) return;
+  const res = await api(
+    "/api/rooms/" + encodeURIComponent(state.currentRoom.room_id) + "/invites",
+    { method: "POST", body: JSON.stringify({ expires_in_hours: 24 }) }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return;
+  const url = new URL(location.href);
+  url.search = "";
+  url.hash = "invite=" + encodeURIComponent(data.invite_token);
   try {
-    const res = await api("/api/rooms/" + state.roomId + "/messages", {
-      method: "POST",
-      body: JSON.stringify({
-        sender_name: $("senderName").value || "参加者",
-        sender_type: $("senderType").value,
-        team_id: $("teamId").value || null,
-        body,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "送信できませんでした");
-    $("messageBody").value = "";
-    if (data.message) appendMessage(data.message);
-    $("sendState").textContent = "追記済み";
-  } catch (error) {
-    $("sendState").textContent = "失敗: " + error.message;
+    await navigator.clipboard.writeText(url.toString());
+    $("copyRoomInviteBtn").textContent = "招待URLをコピー済み";
+    setTimeout(() => $("copyRoomInviteBtn").textContent = "招待URLを作る", 1500);
+  } catch {
+    prompt("このURLをコピーしてください", url.toString());
   }
 }
 
-$("createRoomBtn").addEventListener("click", createRoom);
-$("joinRoomBtn").addEventListener("click", async () => {
-  $("startError").textContent = "";
-  try {
-    await connect($("manualRoomId").value, $("manualRoomKey").value);
-  } catch (error) {
-    $("startError").textContent = error.message;
+function parseInvite() {
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  state.pendingInvite = hash.get("invite") || "";
+}
+
+async function acceptPendingInvite() {
+  if (!state.pendingInvite || !state.token) return;
+  const token = state.pendingInvite;
+  const res = await api("/api/invites/accept", {
+    method: "POST",
+    body: JSON.stringify({ invite_token: token }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    $("inviteNotice").classList.remove("hidden");
+    $("inviteNotice").textContent = data.error === "invite_expired"
+      ? "この招待URLは期限切れです。"
+      : "招待URLを利用できませんでした。";
+    return;
   }
-});
-$("messageForm").addEventListener("submit", sendMessage);
-$("copyInviteBtn").addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(inviteUrl());
-    $("copyInviteBtn").textContent = "コピー済み";
-    setTimeout(() => $("copyInviteBtn").textContent = "招待URLをコピー", 1400);
-  } catch {
-    prompt("このURLをコピーしてください", inviteUrl());
+  state.pendingInvite = "";
+  history.replaceState({}, "", location.pathname + location.search);
+  $("inviteNotice").classList.remove("hidden");
+  $("inviteNotice").textContent = "会議室「" + data.room.title + "」へ参加しました。";
+  await loadRooms();
+  await openRoom(data.room.room_id);
+}
+
+function logout() {
+  if (state.token) {
+    api("/api/auth/logout", { method: "POST", body: "{}" }).catch(() => {});
   }
-});
-$("leaveBtn").addEventListener("click", () => {
   clearInterval(state.pollTimer);
-  state.roomId = "";
-  state.roomKey = "";
-  state.room = null;
-  state.lastId = 0;
-  const url = new URL(location.href);
-  url.search = "";
-  url.hash = "";
-  history.replaceState({}, "", url);
-  setConnected(false);
+  saveToken("");
+  state.me = null;
+  state.currentRoom = null;
+  setView("landing");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+$("openLoginBtn").addEventListener("click", () => showAuth("login"));
+$("heroLoginBtn").addEventListener("click", () => showAuth("login"));
+$("heroRegisterBtn").addEventListener("click", () => showAuth("register"));
+$("bottomStartBtn").addEventListener("click", () => showAuth("login"));
+$("backHomeBtn").addEventListener("click", () => setView("landing"));
+$("toggleAuthModeBtn").addEventListener("click", () => showAuth(state.authMode === "login" ? "register" : "login"));
+$("loginForm").addEventListener("submit", login);
+$("registerForm").addEventListener("submit", register);
+$("logoutBtn").addEventListener("click", logout);
+$("newRoomBtn").addEventListener("click", () => $("newRoomDialog").showModal());
+$("closeRoomDialogBtn").addEventListener("click", () => $("newRoomDialog").close());
+$("newRoomForm").addEventListener("submit", createRoom);
+$("messageForm").addEventListener("submit", sendMessage);
+$("copyRoomInviteBtn").addEventListener("click", createInvite);
+$("backRoomsBtn").addEventListener("click", () => {
+  clearInterval(state.pollTimer);
+  state.currentRoom = null;
+  setPortalSubView("rooms");
+  loadRooms();
 });
+for (const btn of document.querySelectorAll(".nav-item")) {
+  btn.addEventListener("click", () => {
+    clearInterval(state.pollTimer);
+    state.currentRoom = null;
+    setPortalSubView(btn.dataset.view);
+  });
+}
 
 (async () => {
-  const invite = parseInvite();
-  if (invite.roomId && invite.key) {
-    try {
-      await connect(invite.roomId, invite.key);
-    } catch (error) {
-      $("startError").textContent = "招待URLに接続できません: " + error.message;
-      setConnected(false);
-    }
+  parseInvite();
+  if (state.token && await loadMe()) {
+    await enterPortal();
+  } else if (state.pendingInvite) {
+    showAuth("login");
+    $("authLead").textContent = "招待された会議室へ入るには、まずログインしてください。";
+  } else {
+    setView("landing");
   }
 })();
