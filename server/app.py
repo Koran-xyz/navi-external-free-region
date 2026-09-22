@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -21,10 +21,12 @@ from src.notion_writer import NotionWriterError, append_record
 from src.provider_clients import ProviderError, configured_providers, validate_provider_key
 from src.robot_gateway import RobotError, execute_robot_job, robot_status
 from src.cafe_gateway import create_table as cafe_create_table, get_table as cafe_get_table, list_messages as cafe_list_messages, list_tables as cafe_list_tables, post_message as cafe_post_message
+from src.shared_board import append_entry as board_append_entry, as_text as board_as_text, list_entries as board_list_entries
 
-app = FastAPI(title="Navi External Free Region Gateway", version="0.5.0")
+app = FastAPI(title="Navi External Free Region Gateway", version="0.6.0")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 CAFE_DIR = Path(__file__).resolve().parents[1] / "multi_ai_portal" / "public"
+BOARD_DIR = Path(__file__).resolve().parents[1] / "board"
 
 allowed_origin = os.getenv("ALLOWED_ORIGIN", "").strip()
 if allowed_origin:
@@ -57,6 +59,11 @@ class ChatRequest(BaseModel):
 class ProviderKeyCheckRequest(BaseModel):
     provider: str = Field(pattern="^(openai|gemini)$")
     api_key: str = Field(min_length=1, max_length=500)
+
+
+class BoardWriteRequest(BaseModel):
+    name: str = Field(default="参加者", max_length=80)
+    body: str = Field(min_length=1, max_length=12000)
 
 
 class CafeTableCreateRequest(BaseModel):
@@ -105,7 +112,40 @@ def index():
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.5.0"}
+    return {"status": "ok", "version": "0.6.0"}
+
+
+@app.get("/api/board")
+def board_json(after: int = 0):
+    return {"ok": True, "entries": board_list_entries(after)}
+
+
+@app.get("/board/read.txt", response_class=PlainTextResponse)
+def board_text(after: int = 0):
+    return board_as_text(after)
+
+
+@app.get("/board/write", response_class=PlainTextResponse)
+def board_write_by_url(name: str = "参加者", text: str = ""):
+    """Lowest-friction write path: an agent only needs to open one URL."""
+    try:
+        entry = board_append_entry(name, text)
+        return (
+            "WRITE_OK\n"
+            f"id={entry['id']}\n"
+            f"name={entry['name']}\n"
+            f"created_at={entry['created_at']}\n"
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/board/write", status_code=201)
+def board_write_json(request: BoardWriteRequest):
+    try:
+        return {"ok": True, "entry": board_append_entry(request.name, request.body)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/tables")
@@ -270,5 +310,6 @@ def create_log(record: WorkRecord, authorization: str | None = Header(default=No
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-# AI Cafe UI. Keep this mount last so API routes remain authoritative.
+# Static shared surfaces. Keep mounts last so API routes remain authoritative.
+app.mount("/board", StaticFiles(directory=BOARD_DIR, html=True), name="shared-board")
 app.mount("/cafe", StaticFiles(directory=CAFE_DIR, html=True), name="ai-cafe")
