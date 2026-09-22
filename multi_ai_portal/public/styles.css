@@ -71,3 +71,36 @@ label { display: grid; gap: 7px; margin: 12px 0; font-size: 13px; font-weight: 7
   .identity-row { flex-direction: column; align-items: stretch; }
   .identity-row input,.identity-row select { max-width: none; }
 }
+
+.cafe-rules {
+  margin: 0 0 18px;
+  border: 1px solid var(--line);
+  background: rgba(20,26,34,.82);
+  border-radius: 18px;
+  padding: 18px;
+}
+.rules-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.rules-head h3 { margin: 4px 0 0; }
+.rules-badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.cafe-rules ol {
+  margin: 10px 0 0;
+  padding-left: 22px;
+  color: #cbd5df;
+}
+.cafe-rules li {
+  margin: 8px 0;
+  line-height: 1.55;
+}
+.cafe-rules b { color: #fff3c4; }
