@@ -48,11 +48,22 @@ def _extract_openai_text(data: dict[str, Any]) -> str:
 
 
 def _extract_gemini_text(data: dict[str, Any]) -> str:
+    """Extract text from Gemini GenerateContent or Interactions responses."""
     direct = data.get("output_text")
     if isinstance(direct, str) and direct.strip():
         return direct.strip()
 
     chunks: list[str] = []
+
+    # GenerateContent response shape.
+    for candidate in data.get("candidates", []) or []:
+        content = candidate.get("content") or {}
+        for part in content.get("parts", []) or []:
+            text = part.get("text")
+            if isinstance(text, str) and text.strip():
+                chunks.append(text.strip())
+
+    # Interactions response shape (kept for backward compatibility).
     for step in data.get("steps", []) or []:
         if step.get("type") != "model_output":
             continue
@@ -60,9 +71,10 @@ def _extract_gemini_text(data: dict[str, Any]) -> str:
             text = part.get("text")
             if isinstance(text, str) and text.strip():
                 chunks.append(text.strip())
+
     if chunks:
         return "\n".join(chunks)
-    raise ProviderError("Gemini interaction did not contain text output")
+    raise ProviderError("Gemini response did not contain text output")
 
 
 async def validate_provider_key(provider: str, api_key: str) -> None:
@@ -125,51 +137,80 @@ async def call_gemini(prompt: str, system: str, api_key: str | None = None) -> d
     if not key:
         raise ProviderError("GEMINI_API_KEY is not configured")
 
-    preferred = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    preferred = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
     fallbacks = [
         m.strip()
         for m in os.getenv(
             "GEMINI_FALLBACK_MODELS",
-            "gemini-3.7-flash,gemini-3.6-flash",
+            "gemini-3.5-flash-lite,gemini-2.5-flash",
         ).split(",")
         if m.strip()
     ]
-    models = []
+
+    models: list[str] = []
     for candidate in [preferred, *fallbacks]:
-        if candidate not in models:
+        if candidate and candidate not in models:
             models.append(candidate)
 
-    combined = f"{system}\n\n--- 利用者の依頼 ---\n{prompt}"
-    last_error = None
-
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        for model in models:
-            payload = {
-                "model": model,
-                "input": combined,
-                "store": False,
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": prompt}],
             }
-            response = await client.post(
-                "https://generativelanguage.googleapis.com/v1beta/interactions",
-                headers={"x-goog-api-key": key, "Content-Type": "application/json"},
-                json=payload,
+        ],
+        "system_instruction": {
+            "parts": [{"text": system}],
+        },
+    }
+
+    last_error = "unknown error"
+    timeout = httpx.Timeout(connect=10.0, read=35.0, write=20.0, pool=10.0)
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for model in models:
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent"
             )
+            try:
+                response = await client.post(
+                    url,
+                    headers={
+                        "x-goog-api-key": key,
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+            except httpx.TimeoutException:
+                last_error = f"{model}: timeout"
+                continue
+            except httpx.RequestError as exc:
+                last_error = f"{model}: network error ({exc.__class__.__name__})"
+                continue
 
             if not response.is_error:
                 data = response.json()
                 return {
                     "provider": "gemini",
-                    "model": data.get("model", model),
+                    "model": model,
                     "text": _extract_gemini_text(data),
-                    "request_id": data.get("id"),
+                    "request_id": response.headers.get("x-request-id"),
                 }
 
-            last_error = f"{response.status_code} {response.text[:500]}"
-            # High-demand / throttling errors can be temporary. Try a stable fallback model.
-            if response.status_code not in (429, 503):
-                break
+            last_error = f"{model}: HTTP {response.status_code} {response.text[:300]}"
 
-    raise ProviderError(f"Gemini API error: {last_error or 'unknown error'}")
+            # Retry another stable model for temporary capacity/rate-limit errors.
+            if response.status_code in (429, 500, 502, 503, 504):
+                continue
+
+            # Model-not-found / invalid model can also fall back.
+            if response.status_code == 404:
+                continue
+
+            break
+
+    raise ProviderError(f"Gemini API error: {last_error}")
 
 
 async def call_copilot_bridge(
