@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src.multi_ai_router import route_and_call, shared_context
+from src.multi_ai_router import public_context, route_and_call, shared_context
 from src.notion_writer import NotionWriterError, append_record
 from src.provider_clients import ProviderError, configured_providers, validate_provider_key
 from src.robot_gateway import RobotError, execute_robot_job, robot_status
@@ -50,10 +50,16 @@ class WorkRecord(BaseModel):
     source: str = Field(default="browser-chat / notion-writer", max_length=500)
 
 
+class ChatMessage(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=12000)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
     preferred_provider: str | None = Field(default=None, pattern="^(openai|gemini|copilot)$")
     verify: bool = False
+    history: list[ChatMessage] = Field(default_factory=list, max_length=20)
 
 
 class ProviderKeyCheckRequest(BaseModel):
@@ -236,7 +242,7 @@ def chat_providers(authorization: str | None = Header(default=None)):
     _authorize(authorization, "GATEWAY_CHAT_KEY")
     return {
         "providers": configured_providers(),
-        "external_free_region": shared_context(),
+        "external_free_region": public_context(shared_context()),
     }
 
 
@@ -273,6 +279,7 @@ async def chat(
             preferred_provider=request.preferred_provider,
             verify=request.verify,
             api_keys=api_keys,
+            history=[item.model_dump() for item in request.history],
         )
     except ProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
