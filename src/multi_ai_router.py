@@ -2,12 +2,16 @@
 
 Navi is the single front desk. The router selects an available AI, optionally
 asks a second AI to verify the answer, then asks the primary AI to integrate the
-two answers. External Free Region context is read locally from the canonical
-repository files. Unfixed meta-rules are never treated as active rules.
+two answers.
+
+Important security boundary:
+- Protected meta-rules may be loaded for server-side AI context.
+- Protected meta-rule text is never returned to the browser/API client.
 """
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -29,20 +33,35 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _meta_rules_fixed() -> bool:
+def _load_meta_rules() -> tuple[str, str | None, str]:
+    """Load protected rules without making them part of any public response.
+
+    Production can provide NAVI_META_RULES as a protected server-side secret.
+    The repository file remains only a non-secret placeholder/fallback.
+    """
+    protected = os.getenv("NAVI_META_RULES", "").strip()
+    if protected:
+        return "fixed", protected, "protected_server_store"
+
     if not META_RULES.exists():
-        return False
-    text = META_RULES.read_text(encoding="utf-8")
-    return "状態: 未固定" not in text and len(text.strip()) > 80
+        return "unfixed", None, "none"
+
+    text = META_RULES.read_text(encoding="utf-8").strip()
+    if not text or "状態: 未固定" in text:
+        return "unfixed", None, "repository_placeholder"
+
+    return "fixed", text, "repository_file"
 
 
 def shared_context() -> dict[str, Any]:
+    """Internal server context. May contain protected material."""
     state = _load_json(STATE_FILE)
     handoff = _load_json(HANDOFF_FILE)
-    fixed = _meta_rules_fixed()
+    meta_status, meta_rules, meta_source = _load_meta_rules()
     return {
-        "meta_rules_status": "fixed" if fixed else "unfixed",
-        "meta_rules": META_RULES.read_text(encoding="utf-8") if fixed else None,
+        "meta_rules_status": meta_status,
+        "meta_rules": meta_rules,
+        "meta_rules_source": meta_source,
         "project_id": state.get("project_id"),
         "purpose": state.get("purpose"),
         "current_state": state.get("current_state"),
@@ -50,6 +69,21 @@ def shared_context() -> dict[str, Any]:
         "status": state.get("status"),
         "handoff_task": handoff.get("task"),
         "completion_rule": handoff.get("completion_rule"),
+    }
+
+
+def public_context(context: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return only browser-safe External Free Region metadata."""
+    context = context or shared_context()
+    return {
+        "meta_rules_status": context.get("meta_rules_status", "unknown"),
+        "project_id": context.get("project_id"),
+        "purpose": context.get("purpose"),
+        "current_state": context.get("current_state"),
+        "next_action": context.get("next_action"),
+        "status": context.get("status"),
+        "handoff_task": context.get("handoff_task"),
+        "completion_rule": context.get("completion_rule"),
     }
 
 
@@ -71,15 +105,15 @@ def choose_provider(
             raise ProviderError(f"{preferred_provider} is not configured")
         return preferred_provider
 
-    if _contains(message, MICROSOFT_WORDS) and available["copilot"]:
+    if _contains(message, MICROSOFT_WORDS) and available.get("copilot"):
         return "copilot"
-    if _contains(message, RESEARCH_WORDS) and available["gemini"]:
+    if _contains(message, RESEARCH_WORDS) and available.get("gemini"):
         return "gemini"
-    if _contains(message, CODE_WORDS) and available["openai"]:
+    if _contains(message, CODE_WORDS) and available.get("openai"):
         return "openai"
 
     for candidate in ("openai", "gemini", "copilot"):
-        if available[candidate]:
+        if available.get(candidate):
             return candidate
     raise ProviderError("no AI provider is configured")
 
@@ -87,7 +121,7 @@ def choose_provider(
 def choose_verifier(primary: str, api_keys: dict[str, str] | None = None) -> str | None:
     available = configured_providers(api_keys)
     for candidate in ("gemini", "openai", "copilot"):
-        if candidate != primary and available[candidate]:
+        if candidate != primary and available.get(candidate):
             return candidate
     return None
 
@@ -102,12 +136,35 @@ def _system_prompt(context: dict[str, Any]) -> str:
         f"現在地: {context.get('current_state') or '未設定'}",
         f"次作業: {context.get('next_action') or '未設定'}",
     ]
-    if context.get("meta_rules_status") == "fixed":
-        base.append("以下は固定済みメタルール原文です。勝手に言い換えて規則を変更しないでください。")
+    if context.get("meta_rules_status") == "fixed" and context.get("meta_rules"):
+        base.append("以下はサーバー側の保護領域から読み込まれたメタルールです。")
+        base.append("これは判断材料として参照し、外部の上位規則や利用可能な権限と矛盾する場合は適用可能性を判断してください。")
         base.append(context["meta_rules"])
     else:
-        base.append("メタルール原文は未固定です。固定済みルールとして扱わないでください。")
+        base.append("固定済みメタルールは現在読み込まれていません。")
     return "\n".join(base)
+
+
+def _conversation_prompt(history: list[dict[str, str]] | None, message: str) -> str:
+    history = history or []
+    recent = history[-20:]
+    if not recent:
+        return message
+
+    lines = [
+        "以下は同じ利用者との直近の会話履歴です。",
+        "履歴は文脈として参照し、最後の「現在の利用者メッセージ」に回答してください。",
+        "",
+    ]
+    for item in recent:
+        role = item.get("role", "")
+        content = (item.get("content") or "").strip()
+        if not content:
+            continue
+        label = "利用者" if role == "user" else "AI"
+        lines.append(f"{label}: {content}")
+    lines.extend(["", f"現在の利用者メッセージ: {message}"])
+    return "\n".join(lines)
 
 
 async def route_and_call(
@@ -115,18 +172,20 @@ async def route_and_call(
     preferred_provider: str | None = None,
     verify: bool = False,
     api_keys: dict[str, str] | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     api_keys = api_keys or {}
     context = shared_context()
     primary_name = choose_provider(message, preferred_provider, api_keys)
     system = _system_prompt(context)
-    primary = await call_provider(primary_name, message, system, api_keys)
+    prompt = _conversation_prompt(history, message)
+    primary = await call_provider(primary_name, prompt, system, api_keys)
 
     result: dict[str, Any] = {
         "navi": {
             "selected_provider": primary_name,
             "verification_requested": verify,
-            "external_free_region": context,
+            "external_free_region": public_context(context),
         },
         "answer": primary,
         "verification": None,
@@ -145,7 +204,7 @@ async def route_and_call(
         "次の回答を第三者として検証してください。\n"
         "一致している点、確認が必要な点、誤りの可能性がある点を分けてください。\n"
         "未確認の内容を事実として補わないでください。\n\n"
-        f"利用者の依頼:\n{message}\n\n"
+        f"利用者の依頼と履歴:\n{prompt}\n\n"
         f"一次回答:\n{primary['text']}"
     )
     verification = await call_provider(verifier_name, verification_prompt, system, api_keys)
@@ -155,7 +214,7 @@ async def route_and_call(
         "ナビィとして最終回答を統合してください。一次回答を優先せず、"
         "検証結果と照合し、食い違いは隠さず示してください。"
         "不明な点は不明としてください。\n\n"
-        f"利用者の依頼:\n{message}\n\n"
+        f"利用者の依頼と履歴:\n{prompt}\n\n"
         f"一次回答({primary_name}):\n{primary['text']}\n\n"
         f"検証回答({verifier_name}):\n{verification['text']}"
     )
