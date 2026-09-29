@@ -125,28 +125,51 @@ async def call_gemini(prompt: str, system: str, api_key: str | None = None) -> d
     if not key:
         raise ProviderError("GEMINI_API_KEY is not configured")
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    preferred = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    fallbacks = [
+        m.strip()
+        for m in os.getenv(
+            "GEMINI_FALLBACK_MODELS",
+            "gemini-3.7-flash,gemini-3.6-flash",
+        ).split(",")
+        if m.strip()
+    ]
+    models = []
+    for candidate in [preferred, *fallbacks]:
+        if candidate not in models:
+            models.append(candidate)
+
     combined = f"{system}\n\n--- 利用者の依頼 ---\n{prompt}"
-    payload = {
-        "model": model,
-        "input": combined,
-        "store": False,
-    }
+    last_error = None
+
     async with httpx.AsyncClient(timeout=90.0) as client:
-        response = await client.post(
-            "https://generativelanguage.googleapis.com/v1beta/interactions",
-            headers={"x-goog-api-key": key, "Content-Type": "application/json"},
-            json=payload,
-        )
-    if response.is_error:
-        raise ProviderError(f"Gemini API error: {response.status_code} {response.text[:500]}")
-    data = response.json()
-    return {
-        "provider": "gemini",
-        "model": data.get("model", model),
-        "text": _extract_gemini_text(data),
-        "request_id": data.get("id"),
-    }
+        for model in models:
+            payload = {
+                "model": model,
+                "input": combined,
+                "store": False,
+            }
+            response = await client.post(
+                "https://generativelanguage.googleapis.com/v1beta/interactions",
+                headers={"x-goog-api-key": key, "Content-Type": "application/json"},
+                json=payload,
+            )
+
+            if not response.is_error:
+                data = response.json()
+                return {
+                    "provider": "gemini",
+                    "model": data.get("model", model),
+                    "text": _extract_gemini_text(data),
+                    "request_id": data.get("id"),
+                }
+
+            last_error = f"{response.status_code} {response.text[:500]}"
+            # High-demand / throttling errors can be temporary. Try a stable fallback model.
+            if response.status_code not in (429, 503):
+                break
+
+    raise ProviderError(f"Gemini API error: {last_error or 'unknown error'}")
 
 
 async def call_copilot_bridge(
