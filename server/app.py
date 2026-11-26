@@ -132,6 +132,19 @@ def index():
     )
 
 
+@app.get("/gcgw-room")
+def gcgw_room():
+    return FileResponse(
+        BOARD_DIR / "index.html",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
+    )
+
+
 @app.get("/chat")
 def chat_page():
     return FileResponse(
@@ -172,9 +185,9 @@ def gcgw_lite_state(project: str | None = None):
         "trust=UNVERIFIED\n"
         "privileged_external_actions=DENY\n\n"
         "[BOARD]\n"
-        + gcgw_board_text(project=project)
+        + gcgw_board_text(limit=1000, project=project)
         + "\n\n[WORK TABLE]\n"
-        + gcgw_work_text(project=project)
+        + gcgw_work_text(limit=1000, project=project)
     )
 
 
