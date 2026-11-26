@@ -132,6 +132,18 @@ def index():
     )
 
 
+@app.get("/chat")
+def chat_page():
+    return FileResponse(
+        WEB_DIR / "chat.html",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "version": "0.8.0", "gcgw": "simple_ping_state_write"}
