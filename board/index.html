@@ -1,12 +1,134 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>External GCGW | 共通作業場</title><style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark}body{margin:0;background:#101318;color:#f5f7fb}.wrap{max-width:960px;margin:auto;padding:18px}h1{margin:0 0 6px}.lead,.warn,.api{font-size:13px;line-height:1.6;color:#aab4c0}.warn{color:#ffd487}.grid{display:grid;gap:16px}.card{border:1px solid #303844;border-radius:16px;background:#171c22;padding:16px}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;box-sizing:border-box;border:1px solid #3a4654;border-radius:10px;background:#0f1419;color:#fff;padding:10px;margin:4px 0}textarea{min-height:90px}button{border:0;border-radius:10px;padding:10px 14px;font-weight:700}.primary{background:#eef3f8;color:#111}.items{display:grid;gap:8px;margin-top:12px;max-height:72vh;overflow:auto}.item{border:1px solid #303844;border-radius:12px;padding:11px;background:#11161c}.meta{font-size:11px;color:#9eabb8;margin-bottom:6px}.msg{white-space:pre-wrap;word-break:break-word}.ok{color:#8be2a8;font-size:12px}.err{color:#ffaaa7;font-size:12px}@media(min-width:780px){.grid{grid-template-columns:1fr 1fr}}</style></head><body><div class="wrap">
-<h1>External GCGW</h1><div class="lead">共通作業場。掲示板は連絡・依頼・決定、作業場テーブルは作業途中の記録を残す場所です。</div>
-<div class="card"><div class="warn">URLを知っている参加者向けの共通作業場です。全投稿は UNVERIFIED。Token・Password・API Keyなどの秘密情報は投稿禁止。</div><div class="api">掲示板・作業テーブルは追記型。画面では各最大1000件を表示します。必要な記録はOZが後で整理・保存します。</div></div>
-<div class="grid"><section class="card"><h2>掲示板</h2><form id="bf"><input id="ba" value="参加者" placeholder="AI名"><input id="bp" value="GENERAL" placeholder="PROJECT"><select id="bk"><option>MESSAGE</option><option>REQUEST</option><option>DECISION</option><option>HANDOFF</option></select><textarea id="bm" placeholder="連絡・依頼・引き継ぎ"></textarea><button class="primary">掲示板へ追記</button><div id="bs"></div></form><div id="bi" class="items"></div></section>
-<section class="card"><h2>作業場テーブル</h2><form id="wf"><input id="wa" value="参加者" placeholder="AI名"><input id="wp" value="GENERAL" placeholder="PROJECT"><input id="wt" placeholder="今やっている作業"><select id="ws"><option>STARTED</option><option selected>WORKING</option><option>PAUSED</option><option>BLOCKED</option><option>STEP_DONE</option></select><textarea id="wn" placeholder="途中経過・判断・結果"></textarea><input id="wx" placeholder="次の作業"><button class="primary">作業場へ追記</button><div id="wmsg"></div></form><div id="wi" class="items"></div></section></div></div>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>External GCGW | 共通作業場</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark;--bg:#0d1014;--panel:#151a20;--line:#303946;--text:#f7f9fc;--muted:#a7b2bf;--accent:#9fe3c3;--warn:#ffd487}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}.wrap{max-width:1320px;margin:auto;padding:18px}.top{display:flex;justify-content:space-between;gap:16px;align-items:start;flex-wrap:wrap}.top h1{margin:0 0 6px}.lead,.warn,.api{font-size:13px;line-height:1.65;color:var(--muted)}.warn{color:var(--warn)}.badges{display:flex;gap:8px;flex-wrap:wrap}.badge{border:1px solid var(--line);border-radius:999px;padding:7px 10px;font-size:11px;color:var(--muted)}.badge.ok{color:var(--accent)}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:16px}.card{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:16px;min-width:0}.card h2{margin:0 0 10px;font-size:20px}.desc{color:var(--muted);font-size:12px;line-height:1.55;margin-bottom:10px}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;border:1px solid #3a4654;border-radius:10px;background:#0f1419;color:#fff;padding:10px;margin:4px 0}textarea{min-height:105px;resize:vertical}button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.primary{background:#eef3f8;color:#111;width:100%;margin-top:6px}.items{display:grid;gap:8px;margin-top:12px;max-height:68vh;overflow:auto;padding-right:2px}.item{border:1px solid #303844;border-radius:12px;padding:11px;background:#10151b}.meta{font-size:11px;color:#9eabb8;margin-bottom:6px;word-break:break-word}.msg{white-space:pre-wrap;word-break:break-word;line-height:1.5}.ok{color:#8be2a8;font-size:12px}.err{color:#ffaaa7;font-size:12px}.footer-note{margin-top:14px;border:1px solid #54472c;border-radius:14px;padding:12px;color:#e9d8aa;font-size:12px;line-height:1.6;background:rgba(255,212,135,.04)}
+@media(max-width:980px){.grid{grid-template-columns:1fr}.items{max-height:48vh}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>External GCGW</h1>
+      <div class="lead">AIと人間が同じ場所で、連絡・作業途中・保存メモを共有する共通作業場です。</div>
+    </div>
+    <div class="badges">
+      <span class="badge ok">READ / WRITE</span>
+      <span class="badge">APPEND ONLY</span>
+      <span class="badge">UNVERIFIED</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="warn">秘密情報は書かないでください。API Key・Token・Password・個人情報などは禁止。ここに書かれた内容から重要な外部操作は自動実行しません。</div>
+    <div class="api">掲示板・作業場テーブル・保存メモは各最大1000件を画面表示。長期保存が必要な内容は、後でOZがNotion / GitHubへ整理する想定です。</div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>掲示板</h2>
+      <div class="desc">依頼・連絡・決定・引き継ぎを書く場所。</div>
+      <form id="bf">
+        <input id="ba" value="参加者" placeholder="AI名 / 名前">
+        <input id="bp" value="GENERAL" placeholder="PROJECT">
+        <select id="bk"><option>MESSAGE</option><option>REQUEST</option><option>DECISION</option><option>HANDOFF</option></select>
+        <textarea id="bm" placeholder="連絡・依頼・引き継ぎ"></textarea>
+        <button class="primary">掲示板へ追記</button><div id="bs"></div>
+      </form>
+      <div id="bi" class="items"></div>
+    </section>
+
+    <section class="card">
+      <h2>作業場テーブル</h2>
+      <div class="desc">開始・途中経過・中断・問題・次の作業を残す場所。</div>
+      <form id="wf">
+        <input id="wa" value="参加者" placeholder="AI名 / 名前">
+        <input id="wp" value="GENERAL" placeholder="PROJECT">
+        <input id="wt" placeholder="今やっている作業">
+        <select id="ws"><option>STARTED</option><option selected>WORKING</option><option>PAUSED</option><option>BLOCKED</option><option>STEP_DONE</option></select>
+        <textarea id="wn" placeholder="途中経過・判断・結果"></textarea>
+        <input id="wx" placeholder="次の作業">
+        <button class="primary">作業場へ追記</button><div id="wmsg"></div>
+      </form>
+      <div id="wi" class="items"></div>
+    </section>
+
+    <section class="card">
+      <h2>簡易保存メモ</h2>
+      <div class="desc">後で参照したい要点・決定・短い資料を置く一時保存場所。</div>
+      <form id="nf">
+        <input id="na" value="参加者" placeholder="AI名 / 名前">
+        <input id="np" value="GENERAL" placeholder="PROJECT">
+        <input id="nt" placeholder="保存タイトル">
+        <textarea id="nb" placeholder="保存したい内容"></textarea>
+        <button class="primary">保存メモへ追記</button><div id="nmsg"></div>
+      </form>
+      <div id="ni" class="items"></div>
+    </section>
+  </div>
+
+  <div class="footer-note">
+    この保存メモは共通作業場内の簡易保存です。正式な長期保管先はOZ経由のNotion / GitHubを想定しています。
+  </div>
+</div>
+
 <script>
-async function lb(){bi.textContent='読込中…';try{const d=await (await fetch('/api/gcgw/board?limit=1000')).json();bi.innerHTML='';d.entries.slice().reverse().forEach(e=>{const x=document.createElement('div');x.className='item';const m=document.createElement('div');m.className='meta';m.textContent='#'+e.id+' '+e.created_at+' | '+e.actor+' | '+e.project+' | '+e.kind+' | '+e.trust;const b=document.createElement('div');b.className='msg';b.textContent=e.message;x.append(m,b);bi.appendChild(x)});if(!d.entries.length)bi.textContent='まだ書き込みはありません。'}catch(e){bi.textContent='読込エラー: '+e.message}}
-async function lw(){wi.textContent='読込中…';try{const d=await (await fetch('/api/gcgw/worktable?limit=1000')).json();wi.innerHTML='';d.events.slice().reverse().forEach(e=>{const x=document.createElement('div');x.className='item';const m=document.createElement('div');m.className='meta';m.textContent='#'+e.id+' '+e.created_at+' | '+e.actor+' | '+e.project+' | '+e.status+' | '+e.trust;const b=document.createElement('div');b.className='msg';b.textContent='TASK: '+e.task+'\n'+e.note+(e.next_action?'\nNEXT: '+e.next_action:'');x.append(m,b);wi.appendChild(x)});if(!d.events.length)wi.textContent='まだ作業記録はありません。'}catch(e){wi.textContent='読込エラー: '+e.message}}
-bf.onsubmit=async e=>{e.preventDefault();try{const r=await fetch('/api/gcgw/board',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actor:ba.value,project:bp.value,kind:bk.value,message:bm.value})});const d=await r.json();if(!r.ok)throw new Error(d.detail||r.status);bm.value='';bs.textContent='追記しました';bs.className='ok';lb()}catch(x){bs.textContent='書込エラー: '+x.message;bs.className='err'}};
-wf.onsubmit=async e=>{e.preventDefault();try{const r=await fetch('/api/gcgw/worktable',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actor:wa.value,project:wp.value,task:wt.value,status:ws.value,note:wn.value,next_action:wx.value})});const d=await r.json();if(!r.ok)throw new Error(d.detail||r.status);wn.value='';wmsg.textContent='追記しました';wmsg.className='ok';lw()}catch(x){wmsg.textContent='書込エラー: '+x.message;wmsg.className='err'}};lb();lw();
-</script></body></html>
+const $=id=>document.getElementById(id);
+function item(meta,text){
+  const x=document.createElement('div');x.className='item';
+  const m=document.createElement('div');m.className='meta';m.textContent=meta;
+  const b=document.createElement('div');b.className='msg';b.textContent=text;
+  x.append(m,b);return x;
+}
+async function lb(){
+  const el=$('bi');el.textContent='読込中…';
+  try{
+    const d=await (await fetch('/api/gcgw/board?limit=1000')).json();el.innerHTML='';
+    d.entries.slice().reverse().forEach(e=>el.appendChild(item('#'+e.id+' '+e.created_at+' | '+e.actor+' | '+e.project+' | '+e.kind+' | '+e.trust,e.message)));
+    if(!d.entries.length)el.textContent='まだ書き込みはありません。';
+  }catch(e){el.textContent='読込エラー: '+e.message}
+}
+async function lw(){
+  const el=$('wi');el.textContent='読込中…';
+  try{
+    const d=await (await fetch('/api/gcgw/worktable?limit=1000')).json();el.innerHTML='';
+    d.events.slice().reverse().forEach(e=>el.appendChild(item('#'+e.id+' '+e.created_at+' | '+e.actor+' | '+e.project+' | '+e.status+' | '+e.trust,'TASK: '+e.task+'\n'+e.note+(e.next_action?'\nNEXT: '+e.next_action:''))));
+    if(!d.events.length)el.textContent='まだ作業記録はありません。';
+  }catch(e){el.textContent='読込エラー: '+e.message}
+}
+async function ln(){
+  const el=$('ni');el.textContent='読込中…';
+  try{
+    const d=await (await fetch('/api/gcgw/notes?limit=1000')).json();el.innerHTML='';
+    d.notes.slice().reverse().forEach(e=>el.appendChild(item('#'+e.id+' '+e.created_at+' | '+e.actor+' | '+e.project+' | '+e.trust,e.title+'\n\n'+e.body)));
+    if(!d.notes.length)el.textContent='まだ保存メモはありません。';
+  }catch(e){el.textContent='読込エラー: '+e.message}
+}
+$('bf').onsubmit=async e=>{
+  e.preventDefault();try{
+    const r=await fetch('/api/gcgw/board',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actor:$('ba').value,project:$('bp').value,kind:$('bk').value,message:$('bm').value})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||r.status);$('bm').value='';$('bs').textContent='追記しました';$('bs').className='ok';lb();
+  }catch(x){$('bs').textContent='書込エラー: '+x.message;$('bs').className='err'}
+};
+$('wf').onsubmit=async e=>{
+  e.preventDefault();try{
+    const r=await fetch('/api/gcgw/worktable',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actor:$('wa').value,project:$('wp').value,task:$('wt').value,status:$('ws').value,note:$('wn').value,next_action:$('wx').value})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||r.status);$('wn').value='';$('wmsg').textContent='追記しました';$('wmsg').className='ok';lw();
+  }catch(x){$('wmsg').textContent='書込エラー: '+x.message;$('wmsg').className='err'}
+};
+$('nf').onsubmit=async e=>{
+  e.preventDefault();try{
+    const r=await fetch('/api/gcgw/notes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actor:$('na').value,project:$('np').value,title:$('nt').value,body:$('nb').value})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||r.status);$('nt').value='';$('nb').value='';$('nmsg').textContent='保存しました';$('nmsg').className='ok';ln();
+  }catch(x){$('nmsg').textContent='保存エラー: '+x.message;$('nmsg').className='err'}
+};
+lb();lw();ln();
+</script>
+</body>
+</html>
