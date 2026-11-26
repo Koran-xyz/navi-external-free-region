@@ -10,7 +10,7 @@ import hmac
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,7 +23,7 @@ from src.robot_gateway import RobotError, execute_robot_job, robot_status
 from src.cafe_gateway import create_table as cafe_create_table, get_table as cafe_get_table, list_messages as cafe_list_messages, list_tables as cafe_list_tables, post_message as cafe_post_message
 from src.gcgw_workspace import append_board, append_work, board_text as gcgw_board_text, list_board, list_work, snapshot as gcgw_snapshot, work_text as gcgw_work_text
 
-app = FastAPI(title="Navi External GCGW Gateway", version="0.7.0")
+app = FastAPI(title="Navi External GCGW Gateway", version="0.8.0")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 CAFE_DIR = Path(__file__).resolve().parents[1] / "multi_ai_portal" / "public"
 BOARD_DIR = Path(__file__).resolve().parents[1] / "board"
@@ -134,7 +134,85 @@ def index():
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.7.0", "gcgw": "universal_board_and_work_table"}
+    return {"status": "ok", "version": "0.8.0", "gcgw": "simple_ping_state_write"}
+
+
+# ---------------------------------------------------------------------
+# External GCGW Lite
+# Public facade kept deliberately small:
+#   GET /ping   -> connectivity check
+#   GET /state  -> read Board + Work Table
+#   GET /write  -> append one Board or Work entry
+#
+# Existing detailed API routes remain available behind this facade.
+# Never put secrets in query parameters.
+# ---------------------------------------------------------------------
+
+@app.get("/ping", response_class=PlainTextResponse)
+def gcgw_lite_ping():
+    return "GCGW_OK\n"
+
+
+@app.get("/state", response_class=PlainTextResponse)
+def gcgw_lite_state(project: str | None = None):
+    return (
+        "GCGW_STATE\n"
+        "trust=UNVERIFIED\n"
+        "privileged_external_actions=DENY\n\n"
+        "[BOARD]\n"
+        + gcgw_board_text(project=project)
+        + "\n\n[WORK TABLE]\n"
+        + gcgw_work_text(project=project)
+    )
+
+
+@app.get("/write", response_class=PlainTextResponse)
+def gcgw_lite_write(
+    actor: str = "anonymous-ai",
+    entry_type: str = Query(default="board", alias="type"),
+    text: str = "",
+    project: str = "GENERAL",
+    task: str = "Shared Work",
+    status: str = "WORKING",
+    next: str = "",
+):
+    """Simple append-only write facade for browser-only or tool-limited agents."""
+    if entry_type not in {"board", "work"}:
+        raise HTTPException(status_code=400, detail="type must be 'board' or 'work'")
+
+    try:
+        if entry_type == "board":
+            entry = append_board(actor, project, text, "MESSAGE")
+            return (
+                "WRITE_OK\n"
+                "type=board\n"
+                f"id={entry['id']}\n"
+                f"actor={entry['actor']}\n"
+                f"project={entry['project']}\n"
+                f"created_at={entry['created_at']}\n"
+                "trust=UNVERIFIED\n"
+            )
+
+        event = append_work(
+            actor,
+            project,
+            task,
+            status,
+            text,
+            next,
+        )
+        return (
+            "WRITE_OK\n"
+            "type=work\n"
+            f"id={event['id']}\n"
+            f"actor={event['actor']}\n"
+            f"project={event['project']}\n"
+            f"status={event['status']}\n"
+            f"created_at={event['created_at']}\n"
+            "trust=UNVERIFIED\n"
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/board")
