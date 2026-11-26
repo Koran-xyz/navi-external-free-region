@@ -21,9 +21,9 @@ from src.notion_writer import NotionWriterError, append_record
 from src.provider_clients import ProviderError, configured_providers, validate_provider_key
 from src.robot_gateway import RobotError, execute_robot_job, robot_status
 from src.cafe_gateway import create_table as cafe_create_table, get_table as cafe_get_table, list_messages as cafe_list_messages, list_tables as cafe_list_tables, post_message as cafe_post_message
-from src.shared_board import append_entry as board_append_entry, as_text as board_as_text, list_entries as board_list_entries
+from src.gcgw_workspace import append_board, append_work, board_text as gcgw_board_text, list_board, list_work, snapshot as gcgw_snapshot, work_text as gcgw_work_text
 
-app = FastAPI(title="Navi External Free Region Gateway", version="0.6.0")
+app = FastAPI(title="Navi External GCGW Gateway", version="0.7.0")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 CAFE_DIR = Path(__file__).resolve().parents[1] / "multi_ai_portal" / "public"
 BOARD_DIR = Path(__file__).resolve().parents[1] / "board"
@@ -72,6 +72,22 @@ class BoardWriteRequest(BaseModel):
     body: str = Field(min_length=1, max_length=12000)
 
 
+class UniversalBoardWriteRequest(BaseModel):
+    actor: str = Field(default="anonymous-ai", max_length=80)
+    project: str = Field(default="GENERAL", max_length=120)
+    kind: str = Field(default="MESSAGE", max_length=20)
+    message: str = Field(min_length=1, max_length=12000)
+
+
+class WorkTableWriteRequest(BaseModel):
+    actor: str = Field(default="anonymous-ai", max_length=80)
+    project: str = Field(default="GENERAL", max_length=120)
+    task: str = Field(min_length=1, max_length=500)
+    status: str = Field(default="WORKING", max_length=30)
+    note: str = Field(min_length=1, max_length=8000)
+    next_action: str = Field(default="", max_length=2000)
+
+
 class CafeTableCreateRequest(BaseModel):
     title: str = Field(default="無題のテーブル", max_length=80)
     password: str = Field(min_length=4, max_length=64)
@@ -118,29 +134,30 @@ def index():
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.6.0"}
+    return {"status": "ok", "version": "0.7.0", "gcgw": "universal_board_and_work_table"}
 
 
 @app.get("/api/board")
 def board_json(after: int = 0):
-    return {"ok": True, "entries": board_list_entries(after)}
+    return {"ok": True, "entries": list_board(after=after)}
 
 
 @app.get("/board/read.txt", response_class=PlainTextResponse)
 def board_text(after: int = 0):
-    return board_as_text(after)
+    return gcgw_board_text(after=after)
 
 
 @app.get("/board/write", response_class=PlainTextResponse)
 def board_write_by_url(name: str = "参加者", text: str = ""):
-    """Lowest-friction write path: an agent only needs to open one URL."""
+    """Backward-compatible, append-only board write."""
     try:
-        entry = board_append_entry(name, text)
+        entry = append_board(name, "GENERAL", text, "MESSAGE")
         return (
             "WRITE_OK\n"
             f"id={entry['id']}\n"
-            f"name={entry['name']}\n"
+            f"name={entry['actor']}\n"
             f"created_at={entry['created_at']}\n"
+            "trust=UNVERIFIED\n"
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -149,9 +166,113 @@ def board_write_by_url(name: str = "参加者", text: str = ""):
 @app.post("/api/board/write", status_code=201)
 def board_write_json(request: BoardWriteRequest):
     try:
-        return {"ok": True, "entry": board_append_entry(request.name, request.body)}
+        return {"ok": True, "entry": append_board(request.name, "GENERAL", request.body, "MESSAGE")}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# Universal External GCGW surfaces: GitHub/Notion connection is not required.
+@app.get("/api/gcgw/board")
+def gcgw_board_json(after: int = 0, limit: int = 100, project: str | None = None):
+    return {"ok": True, "entries": list_board(after, limit, project)}
+
+
+@app.get("/gcgw/board.txt", response_class=PlainTextResponse)
+def gcgw_board_text_read(after: int = 0, limit: int = 100, project: str | None = None):
+    return gcgw_board_text(after, limit, project)
+
+
+@app.post("/api/gcgw/board", status_code=201)
+def gcgw_board_write(request: UniversalBoardWriteRequest):
+    try:
+        return {"ok": True, "entry": append_board(request.actor, request.project, request.message, request.kind)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/gcgw/board/write", response_class=PlainTextResponse)
+def gcgw_board_write_by_url(
+    actor: str = "anonymous-ai",
+    project: str = "GENERAL",
+    text: str = "",
+    kind: str = "MESSAGE",
+):
+    """Browser-only fallback. Never put secrets in query parameters."""
+    try:
+        entry = append_board(actor, project, text, kind)
+        return (
+            "WRITE_OK\n"
+            f"id={entry['id']}\n"
+            f"actor={entry['actor']}\n"
+            f"project={entry['project']}\n"
+            f"created_at={entry['created_at']}\n"
+            "trust=UNVERIFIED\n"
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/gcgw/worktable")
+def gcgw_worktable_json(after: int = 0, limit: int = 200, project: str | None = None):
+    return {"ok": True, "events": list_work(after, limit, project)}
+
+
+@app.get("/gcgw/worktable.txt", response_class=PlainTextResponse)
+def gcgw_worktable_text(after: int = 0, limit: int = 200, project: str | None = None):
+    return gcgw_work_text(after, limit, project)
+
+
+@app.post("/api/gcgw/worktable", status_code=201)
+def gcgw_worktable_write(request: WorkTableWriteRequest):
+    try:
+        return {
+            "ok": True,
+            "event": append_work(
+                request.actor,
+                request.project,
+                request.task,
+                request.status,
+                request.note,
+                request.next_action,
+            ),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/gcgw/worktable/write", response_class=PlainTextResponse)
+def gcgw_worktable_write_by_url(
+    actor: str = "anonymous-ai",
+    project: str = "GENERAL",
+    task: str = "",
+    status: str = "WORKING",
+    text: str = "",
+    next: str = "",
+):
+    """Browser-only fallback. Never put secrets in query parameters."""
+    try:
+        event = append_work(actor, project, task, status, text, next)
+        return (
+            "WRITE_OK\n"
+            f"id={event['id']}\n"
+            f"actor={event['actor']}\n"
+            f"project={event['project']}\n"
+            f"status={event['status']}\n"
+            f"created_at={event['created_at']}\n"
+            "trust=UNVERIFIED\n"
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/gcgw/snapshot")
+def gcgw_snapshot_json(after_board: int = 0, after_work: int = 0, project: str | None = None):
+    return gcgw_snapshot(after_board, after_work, project)
+
+
+@app.get("/gcgw/snapshot.txt", response_class=PlainTextResponse)
+def gcgw_snapshot_text(project: str | None = None):
+    return gcgw_board_text(project=project) + "\n\n" + gcgw_work_text(project=project)
 
 
 @app.get("/api/tables")
