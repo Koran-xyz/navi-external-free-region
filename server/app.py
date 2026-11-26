@@ -21,7 +21,7 @@ from src.notion_writer import NotionWriterError, append_record
 from src.provider_clients import ProviderError, configured_providers, validate_provider_key
 from src.robot_gateway import RobotError, execute_robot_job, robot_status
 from src.cafe_gateway import create_table as cafe_create_table, get_table as cafe_get_table, list_messages as cafe_list_messages, list_tables as cafe_list_tables, post_message as cafe_post_message
-from src.gcgw_workspace import append_board, append_work, board_text as gcgw_board_text, list_board, list_work, snapshot as gcgw_snapshot, work_text as gcgw_work_text
+from src.gcgw_workspace import append_board, append_note, append_work, board_text as gcgw_board_text, list_board, list_notes, list_work, notes_text as gcgw_notes_text, snapshot as gcgw_snapshot, work_text as gcgw_work_text
 
 app = FastAPI(title="Navi External GCGW Gateway", version="0.8.0")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
@@ -88,6 +88,13 @@ class WorkTableWriteRequest(BaseModel):
     next_action: str = Field(default="", max_length=2000)
 
 
+class SavedNoteWriteRequest(BaseModel):
+    actor: str = Field(default="anonymous-ai", max_length=80)
+    project: str = Field(default="GENERAL", max_length=120)
+    title: str = Field(min_length=1, max_length=300)
+    body: str = Field(min_length=1, max_length=12000)
+
+
 class CafeTableCreateRequest(BaseModel):
     title: str = Field(default="無題のテーブル", max_length=80)
     password: str = Field(min_length=4, max_length=64)
@@ -145,6 +152,18 @@ def gcgw_room():
     )
 
 
+@app.get("/agents")
+def agents_page():
+    return FileResponse(
+        WEB_DIR / "agents.html",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
 @app.get("/chat")
 def chat_page():
     return FileResponse(
@@ -188,6 +207,8 @@ def gcgw_lite_state(project: str | None = None):
         + gcgw_board_text(limit=1000, project=project)
         + "\n\n[WORK TABLE]\n"
         + gcgw_work_text(limit=1000, project=project)
+        + "\n\n[SAVED NOTES]\n"
+        + gcgw_notes_text(limit=1000, project=project)
     )
 
 
@@ -364,6 +385,32 @@ def gcgw_worktable_write_by_url(
             f"created_at={event['created_at']}\n"
             "trust=UNVERIFIED\n"
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/gcgw/notes")
+def gcgw_notes_json(after: int = 0, limit: int = 200, project: str | None = None):
+    return {"ok": True, "notes": list_notes(after, limit, project)}
+
+
+@app.get("/gcgw/notes.txt", response_class=PlainTextResponse)
+def gcgw_notes_text_read(after: int = 0, limit: int = 200, project: str | None = None):
+    return gcgw_notes_text(after, limit, project)
+
+
+@app.post("/api/gcgw/notes", status_code=201)
+def gcgw_notes_write(request: SavedNoteWriteRequest):
+    try:
+        return {
+            "ok": True,
+            "note": append_note(
+                request.actor,
+                request.project,
+                request.title,
+                request.body,
+            ),
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
