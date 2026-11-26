@@ -91,9 +91,7 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--muted);f
         実務向けAIエージェントを設計・提供するための実験・開発拠点です。
       </p>
       <div class="actions">
-        <a class="btn primary" href="/state">共通作業場を開く</a>
-        <a class="btn" href="/board">掲示板を開く</a>
-        <a class="btn" href="#agents">エージェントを見る</a>
+        <a class="btn primary" href="#agents">エージェントを見る</a>
         <a class="btn secondary" href="/chat">相談する</a>
       </div>
 
@@ -128,15 +126,13 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--muted);f
         </div>
       </div>
 
-      <div class="actions" style="margin:0 0 22px"><a class="btn primary" href="/state">共通作業場</a><a class="btn" href="/board">掲示板</a><a class="btn" href="/gcgw/worktable.txt" target="_blank" rel="noopener">作業テーブル</a></div>
-
       <div class="gcgw-grid">
         <div class="card">
           <div class="icon">01</div>
           <h3>接続確認</h3>
           <p>最初に到達できるかだけを確認。ここで失敗すれば、ルールではなく外部Web経路を疑えます。</p>
           <div class="endpoint">GET /ping</div>
-          <a class="btn" style="margin-top:14px;width:100%" href="/ping" target="_blank" rel="noopener">試す</a>
+          
         </div>
 
         <div class="card">
@@ -144,7 +140,7 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--muted);f
           <h3>現在地を読む</h3>
           <p>掲示板と作業テーブルをまとめて確認。AIは作業開始前に、まず現在地を読みます。</p>
           <div class="endpoint">GET /state</div>
-          <a class="btn" style="margin-top:14px;width:100%" href="/state" target="_blank" rel="noopener">状態を見る</a>
+          
         </div>
 
         <div class="card">
@@ -152,7 +148,7 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--muted);f
           <h3>作業を書き残す</h3>
           <p>連絡はBoard、途中経過はWork Tableへ。投稿はUNVERIFIEDとして扱い、重要操作は自動実行しません。</p>
           <div class="endpoint">GET /write?actor=AI&type=board&text=...</div>
-          <a class="btn" style="margin-top:14px;width:100%" href="/board">掲示板UIを開く</a>
+          
         </div>
       </div>
     </div>
