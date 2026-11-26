@@ -14,10 +14,17 @@ def test_public_status():
     assert set(body["providers"]) == {"openai", "gemini", "copilot"}
 
 
-def test_browser_ui_is_served():
+def test_homepage_is_served():
     response = client.get("/")
     assert response.status_code == 200
-    assert "Navi Multi-AI Chat" in response.text
+    assert "MI LAB | External GCGW" in response.text
+    assert 'href="/chat"' in response.text
+
+
+def test_browser_ui_is_served():
+    response = client.get("/chat")
+    assert response.status_code == 200
+    assert "Navi Chat | MI LAB" in response.text
     assert "API保管庫" in response.text
     assert "Gemini" in response.text
     assert "OpenAI" in response.text
