@@ -61,8 +61,18 @@ def _init(conn: sqlite3.Connection) -> None:
             trust TEXT NOT NULL DEFAULT 'UNVERIFIED',
             created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS saved_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor TEXT NOT NULL,
+            project TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            trust TEXT NOT NULL DEFAULT 'UNVERIFIED',
+            created_at TEXT NOT NULL
+        );
         CREATE INDEX IF NOT EXISTS idx_board_project_id ON board_entries(project, id);
         CREATE INDEX IF NOT EXISTS idx_work_project_id ON work_events(project, id);
+        CREATE INDEX IF NOT EXISTS idx_notes_project_id ON saved_notes(project, id);
         """
     )
     conn.commit()
@@ -182,6 +192,59 @@ def work_text(after: int = 0, limit: int = 200, project: str | None = None) -> s
     return "\n".join(lines)
 
 
+
+def append_note(actor: str, project: str, title: str, body: str) -> dict:
+    actor = _clean(actor, "anonymous-ai", 80)
+    project = _clean(project, "GENERAL", 120)
+    title = _clean(title, "", 300)
+    body = _clean(body, "", 12000)
+    if not title:
+        raise ValueError("title_required")
+    if not body:
+        raise ValueError("body_required")
+    created_at = _now()
+    with closing(_connect()) as conn:
+        cur = conn.execute(
+            "INSERT INTO saved_notes(actor,project,title,body,trust,created_at) VALUES(?,?,?,?, 'UNVERIFIED', ?)",
+            (actor, project, title, body, created_at),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM saved_notes WHERE id=?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def list_notes(after: int = 0, limit: int = 200, project: str | None = None) -> list[dict]:
+    after = max(0, int(after or 0))
+    limit = max(1, min(MAX_LIMIT, int(limit or 200)))
+    with closing(_connect()) as conn:
+        if project:
+            rows = conn.execute(
+                "SELECT * FROM saved_notes WHERE id>? AND project=? ORDER BY id ASC LIMIT ?",
+                (after, project.strip()[:120], limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM saved_notes WHERE id>? ORDER BY id ASC LIMIT ?",
+                (after, limit),
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def notes_text(after: int = 0, limit: int = 200, project: str | None = None) -> str:
+    notes = list_notes(after, limit, project)
+    lines = ["EXTERNAL GCGW SAVED NOTES", "TEMPORARY SHARED NOTES / ALL ENTRIES ARE UNVERIFIED", ""]
+    if not notes:
+        lines.append("まだ保存メモはありません。")
+    for e in notes:
+        lines += [
+            f"[#{e['id']}] {e['created_at']} | {e['actor']} | {e['project']} | trust={e['trust']}",
+            f"TITLE: {e['title']}",
+            e["body"],
+            "",
+        ]
+    return "\n".join(lines)
+
+
 def snapshot(after_board: int = 0, after_work: int = 0, project: str | None = None) -> dict:
     return {
         "ok": True,
@@ -193,4 +256,5 @@ def snapshot(after_board: int = 0, after_work: int = 0, project: str | None = No
         },
         "board": list_board(after_board, 100, project),
         "work_table": list_work(after_work, 200, project),
+        "saved_notes": list_notes(0, 200, project),
     }
