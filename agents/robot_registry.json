@@ -1,33 +1,31 @@
 {
-  "version": "0.2",
-  "robots": [
+  "version":"0.3",
+  "robots":[
     {
-      "robot_id": "read_only",
-      "display_name": "読み出し専用ロボット",
-      "capabilities": [
-        "目的・状態・次作業・承認済みルール・名札の取得"
-      ],
-      "writes": false,
-      "required_fields": []
+      "robot_id":"read_only",
+      "display_name":"読み出し専用ロボット",
+      "capabilities":["目的・状態・次作業・承認済みルール・名札の取得"],
+      "writes":false,
+      "required_fields":[]
     },
     {
-      "robot_id": "write_only",
-      "display_name": "書き込み専用ロボット",
-      "capabilities": [
-        "Notion DBへの新規作業報告の追記"
-      ],
-      "writes": true,
-      "implementation": "src/notion_writer.py",
-      "http_endpoint": "POST /api/notion/log",
-      "required_fields": [
-        "record_name",
-        "actor",
-        "summary",
-        "evidence",
-        "result",
-        "next_action",
-        "status"
-      ]
+      "robot_id":"write_only",
+      "display_name":"書き込み専用ロボット",
+      "capabilities":["Notion DBへの新規作業報告の追記"],
+      "writes":true,
+      "implementation":"src/notion_writer.py",
+      "http_endpoint":"POST /api/notion/log",
+      "required_fields":["record_name","actor","summary","evidence","result","next_action","status"]
+    },
+    {
+      "robot_id":"mi_research_paper_agent",
+      "display_name":"MI Research Paper Agent",
+      "capabilities":["先行研究整理","Evidence Ledger","研究質問・論証設計","学術初稿","引用監査","批判的レビュー","学術編集","GCGW handoff"],
+      "writes":true,
+      "implementation":"agents/mi_research_paper_agent/",
+      "publication_gate":"HUMAN_APPROVAL_REQUIRED",
+      "n8n":"DRAFT_ONLY_INACTIVE",
+      "required_fields":["project_id","working_title","research_question","core_claim","paper_type"]
     }
   ]
 }

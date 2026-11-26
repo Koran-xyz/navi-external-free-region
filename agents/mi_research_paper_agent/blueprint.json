@@ -1,0 +1,21 @@
+{
+  "agent_key": "mi.research_paper_agent",
+  "name": "MI Research Paper Agent",
+  "version": "0.1.0",
+  "skeleton": "skeleton.academic_research_writer",
+  "purpose": "Turn a human research project into a defensible manuscript through evidence-led literature review, argument design, drafting, citation audit, adversarial review, editing, and human approval.",
+  "automation_level": "semi_auto",
+  "roles": ["literature_researcher","argument_architect","academic_writer","citation_checker","critical_reviewer","academic_editor"],
+  "permissions": {
+    "external_actions": "DENY_BY_DEFAULT",
+    "publication": "HUMAN_APPROVAL_REQUIRED",
+    "submission": "HUMAN_APPROVAL_REQUIRED",
+    "secrets": "ENV_ONLY"
+  },
+  "release_gate": {
+    "citation_audit_passed": true,
+    "critical_review_completed": true,
+    "limitations_present": true,
+    "human_approval": true
+  }
+}

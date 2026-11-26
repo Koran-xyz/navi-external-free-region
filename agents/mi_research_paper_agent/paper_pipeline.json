@@ -1,0 +1,15 @@
+{
+  "pipeline": "MI_RESEARCH_PAPER_V0_1",
+  "stages": [
+    {"id":"INTAKE","owner":"argument_architect","output":"scope_lock.json"},
+    {"id":"EVIDENCE_LEDGER","owner":"literature_researcher","output":"evidence_ledger.md"},
+    {"id":"PRIOR_WORK_MAP","owner":"literature_researcher","output":"prior_work_map.md"},
+    {"id":"CONTRIBUTION","owner":"argument_architect","output":"contribution_statement.md"},
+    {"id":"OUTLINE","owner":"argument_architect","output":"outline.md"},
+    {"id":"DRAFT","owner":"academic_writer","output":"manuscript_draft.md"},
+    {"id":"CITATION_AUDIT","owner":"citation_checker","output":"citation_audit.md"},
+    {"id":"CRITICAL_REVIEW","owner":"critical_reviewer","output":"review_report.md"},
+    {"id":"EDIT_AND_APPROVE","owner":"academic_editor","output":"candidate_submission.md","human_gate":true}
+  ],
+  "terminal_states":["READY_FOR_PROFESSOR","READY_TO_SUBMIT","BLOCKED","ARCHIVED"]
+}

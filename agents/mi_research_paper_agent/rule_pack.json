@@ -1,0 +1,14 @@
+{
+  "rule_pack":"academic_integrity_v0_1",
+  "rules":[
+    {"id":"R1","rule":"Never fabricate bibliographic metadata, quotes, data, experiments, or results.","severity":"critical"},
+    {"id":"R2","rule":"Unverified claims remain explicitly unverified.","severity":"critical"},
+    {"id":"R3","rule":"Separate hypothesis, interpretation, observation, experiment result, and confirmed source.","severity":"high"},
+    {"id":"R4","rule":"Strong novelty or causality claims require direct evidence and explicit human approval.","severity":"high"},
+    {"id":"R5","rule":"Search for contrary evidence and alternative explanations before finalizing the discussion.","severity":"high"},
+    {"id":"R6","rule":"Include limitations appropriate to the actual evidence and method.","severity":"high"},
+    {"id":"R7","rule":"Do not publish, submit, or send externally without human approval.","severity":"critical"},
+    {"id":"R8","rule":"Do not expose confidential, patent-relevant, or private research material without explicit clearance.","severity":"critical"},
+    {"id":"R9","rule":"Natural academic style is for clarity; never optimize for deceptive AI-authorship concealment.","severity":"high"}
+  ]
+}

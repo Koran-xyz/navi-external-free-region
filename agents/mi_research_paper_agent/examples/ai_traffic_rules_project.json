@@ -1,0 +1,11 @@
+{
+  "project_id":"MI-PAPER-AI-TRAFFIC-RULES-001",
+  "working_title":"AI Traffic Rules: Shared Natural-Language Rules for Heterogeneous Multi-Agent Collaboration",
+  "research_question":"Does placing shared natural-language rules in a common external layer reduce coordination friction, interpretation differences, and unsafe or conflicting actions across heterogeneous AI agents?",
+  "core_claim":"A shared rule layer may function like traffic rules: it can define boundaries and escalation conditions while preserving freedom of action inside those boundaries.",
+  "paper_type":"mixed",
+  "public_scope":"limited",
+  "known_prior_work":["Multi-agent norm emergence research","Governance and coordination research for LLM agents"],
+  "evidence_refs":["Navi / External GCGW operational logs","planned comparative experiments"],
+  "target_venue":null
+}

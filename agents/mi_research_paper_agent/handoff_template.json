@@ -1,0 +1,14 @@
+{
+  "type":"paper_handoff",
+  "project_id":"",
+  "paper_title":"",
+  "current_stage":"",
+  "status":"WORKING",
+  "confirmed_decisions":[],
+  "unresolved_questions":[],
+  "evidence_gaps":[],
+  "artifact_refs":[],
+  "next_action":"",
+  "handoff_to":"",
+  "updated_by":"MI Research Paper Agent"
+}
