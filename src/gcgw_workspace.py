@@ -13,7 +13,7 @@ from pathlib import Path
 
 BOARD_KINDS = {"MESSAGE", "REQUEST", "DECISION", "HANDOFF"}
 WORK_STATUSES = {"STARTED", "WORKING", "PAUSED", "BLOCKED", "STEP_DONE"}
-MAX_LIMIT = 500
+MAX_LIMIT = 2000
 
 
 def _now() -> str:
