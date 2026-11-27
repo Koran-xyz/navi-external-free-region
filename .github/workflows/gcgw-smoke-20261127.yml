@@ -1,0 +1,49 @@
+name: GCGW one-time public synthetic write/readback test
+on:
+  push:
+    branches: [test/gcgw-write-readback-20261127]
+    paths: ['.github/workflows/gcgw-smoke-20261127.yml']
+permissions:
+  contents: read
+concurrency:
+  group: gcgw-smoke-20261127
+  cancel-in-progress: false
+jobs:
+  public-board-test:
+    if: github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Test fixed public board endpoint and verify readback
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from urllib.request import Request, build_opener, HTTPRedirectHandler
+          from urllib.parse import urlencode
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          base = "https://external-gcgw-board.onrender.com/api/gcgw/board"
+          project = "GCGW_SMOKE_TEST"
+          post = {"actor": "ugokukun-smoke-test", "project": project, "kind": "MESSAGE", "message": "[UNVERIFIED] SYNTHETIC TEST: GCGW public append/readback 20261127-01. No operational or private data."}
+          def request(url, method="GET", body=None):
+              req = Request(url, method=method, headers={"Accept":"application/json","Content-Type":"application/json"}, data=None if body is None else json.dumps(body).encode())
+              with build_opener(NoRedirect()).open(req, timeout=60) as res:
+                  return res.status, json.loads(res.read(256000))
+          def matches(e):
+              return isinstance(e, dict) and e.get("trust") == "UNVERIFIED" and all(e.get(k) == v for k,v in post.items())
+          code, data = request(base+"?"+urlencode({"project":project,"limit":100}))
+          assert code == 200 and data.get("ok") is True
+          if any(matches(e) for e in data["entries"]):
+              print("blocked: test marker already exists; no retry")
+              raise SystemExit(1)
+          code, receipt = request(base, "POST", post)
+          entry = receipt.get("entry")
+          assert code == 201 and receipt.get("ok") is True and matches(entry), "write receipt unconfirmed; no retry"
+          eid = entry.get("id")
+          assert type(eid) is int and eid > 0
+          code, data = request(base+"?"+urlencode({"project":project,"after":eid-1,"limit":1}))
+          assert code == 200 and data.get("ok") is True and any(e.get("id")==eid and matches(e) for e in data["entries"]), "readback unconfirmed; no retry"
+          print(json.dumps({"status":"posted","entry_id":eid,"readback_verified":True,"verification_status":"UNVERIFIED"}))
+          PY
